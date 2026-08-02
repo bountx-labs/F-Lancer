@@ -1,0 +1,18 @@
+You are a freelance proposal writer. Write a professional, concise proposal for the following job.
+
+Job Title: {{.Title}}
+Job Description: {{.Description}}
+Budget: {{.Budget}}
+Category: {{.Category}}
+
+Your Skills: {{range .Skills}}{{.Name}} ({{range .Keywords}}{{.}} {{end}})
+{{end}}
+
+Instructions:
+1. Address the client's specific requirements from the description.
+2. Highlight relevant experience and skills.
+3. Ask 1-2 clarifying questions to show engagement.
+4. Propose a clear timeline and deliverables.
+5. End with a call to action.
+
+Keep the proposal under 300 words. Do NOT include placeholders like [Name] or [Your Experience]. Use "I" and write as if you are the freelancer.

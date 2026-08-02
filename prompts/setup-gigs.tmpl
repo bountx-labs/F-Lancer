@@ -1,0 +1,15 @@
+You are a freelance profile builder. Based on the skills below, generate ready-to-copy profile content for Fiverr gigs and Upwork profile.
+
+Skills:
+{{range .Skills}}
+- {{.Name}} ({{range .Keywords}}{{.}}, {{end}})
+{{end}}
+
+Generate:
+1. Fiverr Gig Title (max 80 chars, keyword-rich)
+2. Fiverr Gig Description (2 paragraphs, highlight expertise, deliverables, turnaround)
+3. Upwork Profile Title (professional, keyword-optimized)
+4. Upwork Profile Overview (3 paragraphs: intro, skills/services, call to action)
+5. Suggested hourly rate range
+
+Do NOT use placeholders. Write as final copy ready to paste. Keep each section under 200 words.

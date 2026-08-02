@@ -1,0 +1,23 @@
+{
+  "providers": {
+    "gemini": {
+      "models": {
+        "default": "gemini-flash-latest",
+        "setup": "gemini-3.5-flash",
+        "proposal": "gemini-3.5-flash"
+      }
+    },
+    "opencode": {
+      "models": {
+        "default": "deepseek-v4-flash-free",
+        "proposal": "deepseek-v4-flash-free"
+      }
+    },
+    "kilo": {
+      "models": {
+        "default": "auto-free"
+      }
+    }
+  },
+  "fallback_order": ["gemini", "opencode", "kilo"]
+}

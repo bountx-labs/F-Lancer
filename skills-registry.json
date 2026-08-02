@@ -1,0 +1,49 @@
+{
+  "skills": [
+    {
+      "id": "web-scraping",
+      "name": "Web Scraping & Data Extraction",
+      "keywords": ["scraping", "scraper", "crawler", "beautifulsoup", "selenium", "puppeteer", "playwright", "data extraction", "web automation"],
+      "skills_packages": ["scrapegraphai/just-scrape"],
+      "priority": 8
+    },
+    {
+      "id": "python-dev",
+      "name": "Python Development",
+      "keywords": ["python", "django", "flask", "fastapi", "script", "automation", "backend"],
+      "skills_packages": [],
+      "priority": 9
+    },
+    {
+      "id": "nodejs-dev",
+      "name": "Node.js Development",
+      "keywords": ["node", "nodejs", "javascript", "typescript", "express", "react", "nextjs", "frontend", "fullstack"],
+      "skills_packages": [],
+      "priority": 9
+    },
+    {
+      "id": "seo-marketing",
+      "name": "SEO & Digital Marketing",
+      "keywords": ["seo", "marketing", "audit", "backlink", "keyword research", "social media", "content"],
+      "skills_packages": ["coreyhaines31/marketingskills/seo-audit"],
+      "priority": 6
+    },
+    {
+      "id": "data-analysis",
+      "name": "Data Analysis & Processing",
+      "keywords": ["data", "analysis", "excel", "csv", "json", "api", "database", "sql", "pandas", "visualization"],
+      "skills_packages": [],
+      "priority": 7
+    },
+    {
+      "id": "automation-bots",
+      "name": "Automation & Bot Development",
+      "keywords": ["bot", "automation", "reddit", "discord", "telegram", "twitter", "api integration", "workflow"],
+      "skills_packages": ["doany-skills/skills/reddit-automation"],
+      "priority": 7
+    }
+  ],
+  "default_feeds": [
+    "https://www.freelancer.com/rss.xml"
+  ]
+}

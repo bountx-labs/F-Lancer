@@ -1,0 +1,56 @@
+name: Cron Monitor
+
+on:
+  schedule:
+    - cron: '*/5 * * * *'
+  workflow_dispatch:
+    inputs:
+      mode:
+        description: 'Run mode'
+        required: true
+        type: choice
+        options:
+          - monitor
+          - setup
+      dry_run:
+        description: 'Dry run (no real LLM/Telegram)'
+        required: false
+        type: boolean
+        default: false
+
+jobs:
+  monitor:
+    runs-on: ubuntu-latest
+    timeout-minutes: 8
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-go@v5
+        with:
+          go-version: '1.22'
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Build
+        run: go build ./...
+
+      - name: Run Engine
+        env:
+          TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
+          TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
+          GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
+          OPENCODE_ZEN_API_KEY: ${{ secrets.OPENCODE_ZEN_API_KEY }}
+          OPENCODE_ZEN_BASE_URL: ${{ secrets.OPENCODE_ZEN_BASE_URL }}
+          KILO_GATEWAY_API_KEY: ${{ secrets.KILO_GATEWAY_API_KEY }}
+          KILO_GATEWAY_BASE_URL: ${{ secrets.KILO_GATEWAY_BASE_URL }}
+          TARGET_RSS_FEEDS: ${{ secrets.TARGET_RSS_FEEDS }}
+          MODE: ${{ inputs.mode || 'monitor' }}
+          DRY_RUN: ${{ inputs.dry_run || 'false' }}
+        run: go run ./cmd/freelance-engine
