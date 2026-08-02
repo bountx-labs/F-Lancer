@@ -8,6 +8,7 @@ import (
 	"path/filepath"
 
 	"github.com/bountx-labs/autonomous-freelance-engine/internal/config"
+	"github.com/bountx-labs/autonomous-freelance-engine/internal/executor"
 	"github.com/bountx-labs/autonomous-freelance-engine/internal/llm"
 	"github.com/bountx-labs/autonomous-freelance-engine/internal/matcher"
 	"github.com/bountx-labs/autonomous-freelance-engine/internal/notify"
@@ -73,6 +74,9 @@ func main() {
 		log.Fatalf("init generator: %v", err)
 	}
 
+	skillRunner := executor.New(os.TempDir())
+	generate := withSkillContext(gen, skillRunner)
+
 	tg := notify.NewTelegram(cfg.TelegramBotToken, cfg.TelegramChatID)
 
 	jobCount := 0
@@ -103,7 +107,7 @@ func main() {
 				continue
 			}
 
-			prop, err := gen.GenerateProposal(ctx, job, matches)
+			prop, err := generate(ctx, job, matches)
 			if err != nil {
 				log.Printf("proposal for %s: %v", job.Link, err)
 				continue
@@ -131,6 +135,38 @@ func main() {
 	}
 
 	log.Printf("run complete. processed %d jobs", jobCount)
+}
+
+// withSkillContext wraps proposal generation. For each matched skill that
+// declares skills_packages, it installs the package via `npx skills add`,
+// injects the SKILL.md content into the LLM context, then generates the
+// proposal. Failures to install a skill never block the proposal — the job
+// is flagged skill_missing and the pipeline continues.
+func withSkillContext(gen *proposal.Generator, runner *executor.SkillRunner) func(context.Context, scraper.Job, []matcher.MatchResult) (string, error) {
+	return func(ctx context.Context, job scraper.Job, matches []matcher.MatchResult) (string, error) {
+		var skillContext string
+
+		for _, m := range matches {
+			for _, pkg := range m.Skill.SkillsPackages {
+				res, err := runner.InstallAndRun(pkg)
+				if err != nil || !res.Success {
+					log.Printf("skill %s install failed for %s: %s", pkg, job.Link, res.Error)
+					continue
+				}
+				skillContext += "\n\n" + res.SKILLMD
+				if res.Artifact != "" {
+					skillContext += "\nSample run output:\n" + res.Artifact
+				}
+			}
+		}
+
+		if skillContext != "" {
+			// Clone job description with skill knowledge appended for LLM context.
+			job.Description += "\n\n--- RELEVANT SKILL KNOWLEDGE ---" + skillContext
+		}
+
+		return gen.GenerateProposal(ctx, job, matches)
+	}
 }
 
 func dryRun(cfg *config.Config) {

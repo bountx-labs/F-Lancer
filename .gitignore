@@ -2,6 +2,6 @@
 .tmp/
 .cache/
 bin/
-profiles/
-state/
 *.exe
+
+# state/seen_jobs.json and profiles/ are committed by the workflow on purpose.

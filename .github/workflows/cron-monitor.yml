@@ -18,10 +18,16 @@ on:
         type: boolean
         default: false
 
+concurrency:
+  group: freelance-monitor
+  cancel-in-progress: false
+
 jobs:
   monitor:
     runs-on: ubuntu-latest
     timeout-minutes: 8
+    permissions:
+      contents: write
 
     steps:
       - uses: actions/checkout@v4
@@ -54,3 +60,19 @@ jobs:
           MODE: ${{ inputs.mode || 'monitor' }}
           DRY_RUN: ${{ inputs.dry_run || 'false' }}
         run: go run ./cmd/freelance-engine
+
+      - name: Commit state
+        if: always()
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add state/seen_jobs.json profiles/ 2>/dev/null || true
+          if git diff --cached --quiet; then
+            echo "No state changes"
+            exit 0
+          fi
+          git commit -m "chore: update state [skip ci]"
+          if ! git push; then
+            echo "::error::State commit failed - dedup data will be lost, duplicates may be sent next run"
+            exit 1
+          fi

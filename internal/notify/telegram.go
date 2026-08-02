@@ -29,11 +29,16 @@ func NewTelegram(botToken, chatID string) *Telegram {
 	}
 }
 
+// Send escapes raw text for MarkdownV2 and delivers it.
 func (t *Telegram) Send(text string) error {
-	escaped := escapeMarkdownV2(text)
+	return t.post(escapeMarkdownV2(text))
+}
+
+// post delivers text that is already valid MarkdownV2 (headers kept intact).
+func (t *Telegram) post(markdownText string) error {
 	msg := telegramMessage{
 		ChatID:    t.chatID,
-		Text:      escaped,
+		Text:      markdownText,
 		ParseMode: "MarkdownV2",
 	}
 
@@ -47,6 +52,8 @@ func (t *Telegram) Send(text string) error {
 	defer resp.Body.Close()
 
 	if resp.StatusCode != http.StatusOK {
+		// Fallback: plain text with escape backslashes stripped so it stays readable.
+		msg.Text = strings.ReplaceAll(markdownText, "\\", "")
 		msg.ParseMode = ""
 		data, _ = json.Marshal(msg)
 		resp2, err2 := t.client.Post(url, "application/json", bytes.NewReader(data))
@@ -63,14 +70,15 @@ func (t *Telegram) Send(text string) error {
 }
 
 func (t *Telegram) SendJobAlert(link, proposal, guide string) error {
+	// Headers use MarkdownV2 bold; content is escaped exactly once.
 	blocks := []string{
-		fmt.Sprintf("*New Job Match*\n\n%s", escapeMarkdownV2(link)),
-		fmt.Sprintf("*Proposal*\n\n%s", escapeMarkdownV2(proposal)),
-		fmt.Sprintf("*Executive Guide*\n\n%s", escapeMarkdownV2(guide)),
+		"*New Job Match*\n\n" + escapeMarkdownV2(link),
+		"*Proposal*\n\n" + escapeMarkdownV2(proposal),
+		"*Executive Guide*\n\n" + escapeMarkdownV2(guide),
 	}
 
 	for i, block := range blocks {
-		if err := t.Send(block); err != nil {
+		if err := t.post(block); err != nil {
 			return fmt.Errorf("send block %d: %w", i, err)
 		}
 	}

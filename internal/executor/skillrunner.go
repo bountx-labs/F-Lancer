@@ -33,7 +33,14 @@ func (s *SkillRunner) InstallAndRun(pkg string) (*SkillResult, error) {
 	}
 	defer os.RemoveAll(tmpDir)
 
-	cmd := exec.Command("npx", "skills", "add", pkg)
+	npxPath, err := exec.LookPath("npx")
+	if err != nil {
+		result.Success = false
+		result.Error = "npx not found on PATH; skill skipped"
+		return result, nil
+	}
+
+	cmd := exec.Command(npxPath, "skills", "add", pkg, "--yes")
 	cmd.Dir = tmpDir
 	output, err := cmd.CombinedOutput()
 	if err != nil {
