@@ -29,8 +29,14 @@ func Load(path string) (*SeenJobs, error) {
 		return nil, fmt.Errorf("read state: %w", err)
 	}
 
-	if err := json.Unmarshal(data, &s); err != nil {
+	var disk struct {
+		Hashes map[string]time.Time `json:"hashes"`
+	}
+	if err := json.Unmarshal(data, &disk); err != nil {
 		return nil, fmt.Errorf("parse state: %w", err)
+	}
+	if disk.Hashes != nil {
+		s.Hashes = disk.Hashes
 	}
 
 	s.prune()
