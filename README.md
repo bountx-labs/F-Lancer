@@ -89,4 +89,6 @@ Set `DRY_RUN=true` to test Telegram connectivity without real LLM calls.
 
 ## License
 
-MIT
+Copyright (c) 2026. All rights reserved.
+This repository and its source code are public solely for cloud-execution (GitHub Actions) and educational purposes.
+Strictly Prohibited: Commercial use, modification, redistribution, or publishing as your own work.
