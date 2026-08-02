@@ -81,7 +81,17 @@ func (o *OpenCodeProvider) Complete(ctx context.Context, model string, prompt st
 	return result.Choices[0].Message.Content, nil
 }
 
+// Healthy checks the models endpoint without consuming generation quota.
 func (o *OpenCodeProvider) Healthy(ctx context.Context) bool {
-	_, err := o.Complete(ctx, "deepseek-v4-flash-free", "ping")
-	return err == nil
+	req, err := http.NewRequestWithContext(ctx, "GET", o.baseURL+"/v1/models", nil)
+	if err != nil {
+		return false
+	}
+	req.Header.Set("Authorization", "Bearer "+o.apiKey)
+	resp, err := o.client.Do(req)
+	if err != nil {
+		return false
+	}
+	defer resp.Body.Close()
+	return resp.StatusCode == http.StatusOK
 }

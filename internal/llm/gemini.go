@@ -81,7 +81,18 @@ func (g *GeminiProvider) Complete(ctx context.Context, model string, prompt stri
 	return result.Candidates[0].Content.Parts[0].Text, nil
 }
 
+// Healthy checks API key validity via the lightweight models list endpoint,
+// without consuming generation quota.
 func (g *GeminiProvider) Healthy(ctx context.Context) bool {
-	_, err := g.Complete(ctx, "gemini-flash-latest", "ping")
-	return err == nil
+	req, err := http.NewRequestWithContext(ctx, "GET",
+		"https://generativelanguage.googleapis.com/v1beta/models?key="+g.apiKey+"&pageSize=1", nil)
+	if err != nil {
+		return false
+	}
+	resp, err := g.client.Do(req)
+	if err != nil {
+		return false
+	}
+	defer resp.Body.Close()
+	return resp.StatusCode == http.StatusOK
 }
