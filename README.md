@@ -35,10 +35,9 @@ Go to **Settings → Secrets and variables → Actions** and add:
 | `TELEGRAM_CHAT_ID` | Yes | Your Telegram chat ID |
 | `GEMINI_API_KEY` | Yes | Google AI Studio API key |
 | `OPENCODE_ZEN_API_KEY` | Optional | Fallback LLM key |
-| `OPENCODE_ZEN_BASE_URL` | Optional | Fallback base URL |
+| `OPENCODE_ZEN_BASE_URL` | Optional | Fallback base URL (defaults to https://opencode.ai/zen/v1) |
 | `KILO_GATEWAY_API_KEY` | Optional | Fallback LLM key |
-| `KILO_GATEWAY_BASE_URL` | Optional | Fallback base URL |
-| `TARGET_RSS_FEEDS` | Optional | Custom RSS URLs |
+| `KILO_GATEWAY_BASE_URL` | Optional | Fallback base URL (defaults to https://api.kilo.ai/api/gateway) |
 
 ### 4. Verify Setup
 

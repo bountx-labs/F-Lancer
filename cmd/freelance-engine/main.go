@@ -67,7 +67,7 @@ func main() {
 		log.Fatalf("load state: %v", err)
 	}
 
-	feeds := skillsReg.GetFeeds(cfg.TargetRSSFeeds)
+	feeds := skillsReg.GetFeeds()
 
 	gen, err := proposal.New(pool, filepath.Join(baseDir, "prompts"))
 	if err != nil {

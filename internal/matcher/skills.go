@@ -68,9 +68,6 @@ func (r *SkillsRegistry) Match(title, description string) []MatchResult {
 	return matches
 }
 
-func (r *SkillsRegistry) GetFeeds(envFeeds []string) []string {
-	if len(envFeeds) > 0 {
-		return envFeeds
-	}
+func (r *SkillsRegistry) GetFeeds() []string {
 	return r.DefaultFeeds
 }

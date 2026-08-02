@@ -6,17 +6,21 @@ import (
 	"strings"
 )
 
+const (
+	DefaultOpenCodeZenURL = "https://opencode.ai/zen/v1"
+	DefaultKiloGatewayURL = "https://api.kilo.ai/api/gateway"
+)
+
 type Config struct {
-	TelegramBotToken  string
-	TelegramChatID    string
-	GeminiAPIKey      string
-	OpenCodeZenKey    string
-	OpenCodeZenURL    string
-	KiloGatewayKey    string
-	KiloGatewayURL    string
-	TargetRSSFeeds    []string
-	Mode              string
-	DryRun            bool
+	TelegramBotToken string
+	TelegramChatID   string
+	GeminiAPIKey     string
+	OpenCodeZenKey   string
+	OpenCodeZenURL   string
+	KiloGatewayKey   string
+	KiloGatewayURL   string
+	Mode             string
+	DryRun           bool
 }
 
 func Load() (*Config, error) {
@@ -25,19 +29,15 @@ func Load() (*Config, error) {
 		TelegramChatID:   os.Getenv("TELEGRAM_CHAT_ID"),
 		GeminiAPIKey:     os.Getenv("GEMINI_API_KEY"),
 		OpenCodeZenKey:   os.Getenv("OPENCODE_ZEN_API_KEY"),
-		OpenCodeZenURL:   os.Getenv("OPENCODE_ZEN_BASE_URL"),
+		OpenCodeZenURL:   envOrDefault("OPENCODE_ZEN_BASE_URL", DefaultOpenCodeZenURL),
 		KiloGatewayKey:   os.Getenv("KILO_GATEWAY_API_KEY"),
-		KiloGatewayURL:   os.Getenv("KILO_GATEWAY_BASE_URL"),
+		KiloGatewayURL:   envOrDefault("KILO_GATEWAY_BASE_URL", DefaultKiloGatewayURL),
 		Mode:             os.Getenv("MODE"),
 		DryRun:           strings.ToLower(os.Getenv("DRY_RUN")) == "true",
 	}
 
 	if cfg.Mode == "" {
 		cfg.Mode = "monitor"
-	}
-
-	if feeds := os.Getenv("TARGET_RSS_FEEDS"); feeds != "" {
-		cfg.TargetRSSFeeds = strings.Split(feeds, ",")
 	}
 
 	if cfg.TelegramBotToken == "" {
@@ -48,6 +48,13 @@ func Load() (*Config, error) {
 	}
 
 	return cfg, nil
+}
+
+func envOrDefault(key, fallback string) string {
+	if v := os.Getenv(key); v != "" {
+		return v
+	}
+	return fallback
 }
 
 func (c *Config) HasGemini() bool {
