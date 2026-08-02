@@ -66,6 +66,7 @@ func main() {
 	if err != nil {
 		log.Fatalf("load state: %v", err)
 	}
+	log.Printf("loaded state from %s with %d hashes", seenPath, len(seen.Hashes))
 
 	feeds := skillsReg.GetFeeds()
 
@@ -131,7 +132,7 @@ func main() {
 	}
 
 	if err := seen.Save(); err != nil {
-		log.Printf("save state: %v", err)
+		log.Fatalf("save state FAILED: %v", err)
 	}
 
 	log.Printf("run complete. processed %d jobs", jobCount)

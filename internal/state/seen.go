@@ -4,6 +4,7 @@ import (
 	"crypto/sha1"
 	"encoding/json"
 	"fmt"
+	"log"
 	"os"
 	"sync"
 	"time"
@@ -73,6 +74,7 @@ func (s *SeenJobs) Save() error {
 		return fmt.Errorf("write state: %w", err)
 	}
 
+	log.Printf("state saved: %s (%d hashes)", s.path, len(s.Hashes))
 	return nil
 }
 
