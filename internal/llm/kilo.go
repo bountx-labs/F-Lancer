@@ -15,11 +15,11 @@ type KiloProvider struct {
 	client  *http.Client
 }
 
-func NewKilo(apiKey, baseURL string) *KiloProvider {
+func NewKilo(apiKey, baseURL string, timeout time.Duration) *KiloProvider {
 	return &KiloProvider{
 		apiKey:  apiKey,
 		baseURL: baseURL,
-		client:  &http.Client{Timeout: 30 * time.Second},
+		client:  &http.Client{Timeout: timeout},
 	}
 }
 
@@ -65,7 +65,19 @@ func (k *KiloProvider) Complete(ctx context.Context, model string, prompt string
 	return result.Choices[0].Message.Content, nil
 }
 
+// Healthy checks the models endpoint without consuming generation quota.
+// If the gateway does not expose /v1/models it reports unhealthy, and the
+// pool simply falls through to Complete(), which still attempts the provider.
 func (k *KiloProvider) Healthy(ctx context.Context) bool {
-	_, err := k.Complete(ctx, "auto-free", "ping")
-	return err == nil
+	req, err := http.NewRequestWithContext(ctx, "GET", k.baseURL+"/v1/models", nil)
+	if err != nil {
+		return false
+	}
+	req.Header.Set("Authorization", "Bearer "+k.apiKey)
+	resp, err := k.client.Do(req)
+	if err != nil {
+		return false
+	}
+	defer resp.Body.Close()
+	return resp.StatusCode == http.StatusOK
 }

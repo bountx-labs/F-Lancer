@@ -13,7 +13,7 @@ import (
 	"github.com/bountx-labs/autonomous-freelance-engine/internal/scraper"
 )
 
-var placeholderPattern = regexp.MustCompile(`\[(?:NAME|YOUR|INSERT|TODO|PLACEHOLDER)[^\]]*\]`)
+var placeholderPattern = regexp.MustCompile(`\[(?:NAME|YOUR|INSERT|TODO|PLACEHOLDER|COMPANY|CLIENT|PROJECT|DATE|BUDGET|TIMELINE|EXPERIENCE|SKILL|RATE|LINK)[^\]]*\]`)
 
 type Generator struct {
 	pool       *llm.Pool

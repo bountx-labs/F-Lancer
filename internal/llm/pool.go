@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"os"
+	"time"
 )
 
 type ModelsConfig struct {
@@ -21,20 +22,20 @@ type Pool struct {
 	models    *ModelsConfig
 }
 
-func NewPool(cfg *ModelsConfig, geminiKey, opencodeKey, opencodeURL, kiloKey, kiloURL string) *Pool {
+func NewPool(cfg *ModelsConfig, geminiKey, opencodeKey, opencodeURL, kiloKey, kiloURL string, timeout time.Duration) *Pool {
 	p := &Pool{
 		providers: make(map[string]Provider),
 		models:    cfg,
 	}
 
 	if geminiKey != "" {
-		p.providers["gemini"] = NewGemini(geminiKey)
+		p.providers["gemini"] = NewGemini(geminiKey, timeout)
 	}
 	if opencodeKey != "" && opencodeURL != "" {
-		p.providers["opencode"] = NewOpenCode(opencodeKey, opencodeURL)
+		p.providers["opencode"] = NewOpenCode(opencodeKey, opencodeURL, timeout)
 	}
 	if kiloKey != "" && kiloURL != "" {
-		p.providers["kilo"] = NewKilo(kiloKey, kiloURL)
+		p.providers["kilo"] = NewKilo(kiloKey, kiloURL, timeout)
 	}
 
 	return p
@@ -54,6 +55,27 @@ func LoadModelsConfig(path string) (*ModelsConfig, error) {
 	return &cfg, nil
 }
 
+// Validate verifies that every provider in fallback_order has a config block
+// and a models.default entry so pool.Complete never silently skips providers.
+func (c *ModelsConfig) Validate() error {
+	if len(c.FallbackOrder) == 0 {
+		return fmt.Errorf("models config: fallback_order must not be empty")
+	}
+	for _, name := range c.FallbackOrder {
+		prov, ok := c.Providers[name]
+		if !ok {
+			return fmt.Errorf("models config: provider %q in fallback_order has no config", name)
+		}
+		if len(prov.Models) == 0 {
+			return fmt.Errorf("models config: provider %q has no models configured", name)
+		}
+		if _, ok := prov.Models["default"]; !ok {
+			return fmt.Errorf("models config: provider %q is missing the required models.default entry", name)
+		}
+	}
+	return nil
+}
+
 func (p *Pool) Complete(ctx context.Context, taskProfile string, prompt string) (string, error) {
 	for _, name := range p.models.FallbackOrder {
 		provider, ok := p.providers[name]
@@ -67,11 +89,16 @@ func (p *Pool) Complete(ctx context.Context, taskProfile string, prompt string) 
 		}
 
 		result, err := provider.Complete(ctx, model, prompt)
-		if err != nil {
-			continue
+		if err == nil {
+			return result, nil
 		}
 
-		return result, nil
+		// Retry the same provider once after a short delay before falling back.
+		time.Sleep(time.Second)
+		result, err = provider.Complete(ctx, model, prompt)
+		if err == nil {
+			return result, nil
+		}
 	}
 
 	return "", fmt.Errorf("all LLM providers failed")

@@ -3,6 +3,7 @@ package scraper
 import (
 	"encoding/xml"
 	"fmt"
+	"log"
 	"net/http"
 	"time"
 )
@@ -38,40 +39,62 @@ type Job struct {
 	FeedSource  string
 }
 
-func FetchFeed(url string) ([]Job, error) {
-	client := &http.Client{Timeout: 10 * time.Second}
+// FetchFeed retrieves and parses an RSS feed, retrying transient network and
+// 5xx/429 failures with exponential backoff.
+func FetchFeed(url string, timeout time.Duration) ([]Job, error) {
+	client := &http.Client{Timeout: timeout}
 
-	resp, err := client.Get(url)
-	if err != nil {
-		return nil, fmt.Errorf("fetch %s: %w", url, err)
+	var lastErr error
+	for attempt := 0; attempt < 3; attempt++ {
+		if attempt > 0 {
+			time.Sleep(time.Duration(1<<uint(attempt-1)) * time.Second)
+		}
+
+		resp, err := client.Get(url)
+		if err != nil {
+			lastErr = fmt.Errorf("fetch %s: %w", url, err)
+			continue
+		}
+
+		if resp.StatusCode != http.StatusOK {
+			status := resp.StatusCode
+			resp.Body.Close()
+			lastErr = fmt.Errorf("fetch %s: HTTP %d", url, status)
+			if status >= http.StatusInternalServerError || status == http.StatusTooManyRequests {
+				continue
+			}
+			break
+		}
+
+		var feed RSSFeed
+		if err := xml.NewDecoder(resp.Body).Decode(&feed); err != nil {
+			resp.Body.Close()
+			return nil, fmt.Errorf("parse %s: %w", url, err)
+		}
+		resp.Body.Close()
+
+		var jobs []Job
+		for _, item := range feed.Channel.Items {
+			pubDate, err := parseDate(item.PubDate)
+			if err != nil {
+				log.Printf("date parse failed for %s: %v", url, err)
+				pubDate = time.Now()
+			}
+			jobs = append(jobs, Job{
+				Title:       item.Title,
+				Link:        item.Link,
+				Description: item.Description,
+				Budget:      item.Budget,
+				Category:    item.Category,
+				PubDate:     pubDate,
+				GUID:        item.GUID,
+				FeedSource:  url,
+			})
+		}
+		return jobs, nil
 	}
-	defer resp.Body.Close()
 
-	if resp.StatusCode != http.StatusOK {
-		return nil, fmt.Errorf("fetch %s: HTTP %d", url, resp.StatusCode)
-	}
-
-	var feed RSSFeed
-	if err := xml.NewDecoder(resp.Body).Decode(&feed); err != nil {
-		return nil, fmt.Errorf("parse %s: %w", url, err)
-	}
-
-	var jobs []Job
-	for _, item := range feed.Channel.Items {
-		pubDate, _ := parseDate(item.PubDate)
-		jobs = append(jobs, Job{
-			Title:       item.Title,
-			Link:        item.Link,
-			Description: item.Description,
-			Budget:      item.Budget,
-			Category:    item.Category,
-			PubDate:     pubDate,
-			GUID:        item.GUID,
-			FeedSource:  url,
-		})
-	}
-
-	return jobs, nil
+	return nil, lastErr
 }
 
 func parseDate(s string) (time.Time, error) {

@@ -1,25 +1,40 @@
 package state
 
 import (
-	"crypto/sha1"
+	"crypto/sha256"
 	"encoding/json"
 	"fmt"
 	"log"
 	"os"
+	"path/filepath"
+	"sort"
 	"sync"
 	"time"
 )
 
+const (
+	DefaultPruneDays  = 30
+	DefaultMaxEntries = 500
+)
+
 type SeenJobs struct {
-	mu       sync.Mutex
-	path     string
-	Hashes   map[string]time.Time `json:"hashes"`
+	mu         sync.Mutex
+	path       string
+	pruneDays  int
+	maxEntries int
+	Hashes     map[string]time.Time `json:"hashes"`
 }
 
 func Load(path string) (*SeenJobs, error) {
+	return LoadWithLimits(path, DefaultPruneDays, DefaultMaxEntries)
+}
+
+func LoadWithLimits(path string, pruneDays, maxEntries int) (*SeenJobs, error) {
 	s := &SeenJobs{
-		path:   path,
-		Hashes: make(map[string]time.Time),
+		path:       path,
+		pruneDays:  pruneDays,
+		maxEntries: maxEntries,
+		Hashes:     make(map[string]time.Time),
 	}
 
 	data, err := os.ReadFile(path)
@@ -70,7 +85,7 @@ func (s *SeenJobs) Save() error {
 		return fmt.Errorf("marshal state: %w", err)
 	}
 
-	if err := os.WriteFile(s.path, data, 0644); err != nil {
+	if err := atomicWrite(s.path, data); err != nil {
 		return fmt.Errorf("write state: %w", err)
 	}
 
@@ -79,14 +94,21 @@ func (s *SeenJobs) Save() error {
 }
 
 func (s *SeenJobs) prune() {
-	cutoff := time.Now().UTC().AddDate(0, 0, -30)
+	if s.pruneDays <= 0 {
+		s.pruneDays = DefaultPruneDays
+	}
+	if s.maxEntries <= 0 {
+		s.maxEntries = DefaultMaxEntries
+	}
+
+	cutoff := time.Now().UTC().AddDate(0, 0, -s.pruneDays)
 	for hash, ts := range s.Hashes {
 		if ts.Before(cutoff) {
 			delete(s.Hashes, hash)
 		}
 	}
 
-	if len(s.Hashes) > 500 {
+	if len(s.Hashes) > s.maxEntries {
 		type entry struct {
 			hash string
 			ts   time.Time
@@ -95,14 +117,51 @@ func (s *SeenJobs) prune() {
 		for h, t := range s.Hashes {
 			entries = append(entries, entry{h, t})
 		}
-		for i := 0; i < len(entries)-500; i++ {
+		sort.Slice(entries, func(i, j int) bool {
+			return entries[i].ts.Before(entries[j].ts)
+		})
+		for i := 0; i < len(entries)-s.maxEntries; i++ {
 			delete(s.Hashes, entries[i].hash)
 		}
 	}
 }
 
+// hashURL returns a SHA256 hex digest of the job URL, used as the dedup key.
 func hashURL(url string) string {
-	h := sha1.New()
+	h := sha256.New()
 	h.Write([]byte(url))
 	return fmt.Sprintf("%x", h.Sum(nil))
+}
+
+// atomicWrite writes data to path atomically via a temp file + rename, so a
+// concurrent or interrupted write can never leave a corrupted state file.
+func atomicWrite(path string, data []byte) error {
+	dir := filepath.Dir(path)
+	tmp, err := os.CreateTemp(dir, ".seen_jobs-*.tmp")
+	if err != nil {
+		return err
+	}
+	tmpName := tmp.Name()
+	defer func() {
+		if tmpName != "" {
+			os.Remove(tmpName)
+		}
+	}()
+
+	if _, err := tmp.Write(data); err != nil {
+		tmp.Close()
+		return err
+	}
+	if err := tmp.Sync(); err != nil {
+		tmp.Close()
+		return err
+	}
+	if err := tmp.Close(); err != nil {
+		return err
+	}
+	if err := os.Rename(tmpName, path); err != nil {
+		return err
+	}
+	tmpName = ""
+	return nil
 }

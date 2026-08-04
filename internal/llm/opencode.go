@@ -31,11 +31,11 @@ type openaiResponse struct {
 	} `json:"choices"`
 }
 
-func NewOpenCode(apiKey, baseURL string) *OpenCodeProvider {
+func NewOpenCode(apiKey, baseURL string, timeout time.Duration) *OpenCodeProvider {
 	return &OpenCodeProvider{
 		apiKey:  apiKey,
 		baseURL: baseURL,
-		client:  &http.Client{Timeout: 30 * time.Second},
+		client:  &http.Client{Timeout: timeout},
 	}
 }
 

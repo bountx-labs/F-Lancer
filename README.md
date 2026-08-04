@@ -36,7 +36,7 @@ Go to **Settings → Secrets and variables → Actions** and add:
 | `GEMINI_API_KEY` | Yes | Google AI Studio API key |
 | `OPENCODE_ZEN_API_KEY` | Optional | Fallback LLM key |
 | `OPENCODE_ZEN_BASE_URL` | Optional | Fallback base URL (defaults to https://opencode.ai/zen/v1) |
-| `KILO_GATEWAY_API_KEY` | Optional | Fallback LLM key |
+| `KILO_GATEWAY_API_KEY` | Optional | Fallback LLM key (also accepts `KILO_API_KEY`) |
 | `KILO_GATEWAY_BASE_URL` | Optional | Fallback base URL (defaults to https://api.kilo.ai/api/gateway) |
 
 ### 4. Verify Setup
@@ -50,7 +50,22 @@ Run the smoke test workflow:
 
 1. Go to **Actions → Cron Monitor → Run workflow**
 2. Set `mode` to `setup`
-3. Profiles are generated and committed to `profiles/`
+3. The engine renders `prompts/setup-gigs.tmpl` through the LLM using your skill registry
+4. Generated copy is written to `profiles/gig-profiles.md` and committed to the repo
+
+Setup mode runs the profile-generation pipeline only (no RSS scraping, matching, or dedupe). It requires at least one healthy LLM provider, same as monitor mode.
+
+### Tuning (Optional Env Vars)
+
+All values have built-in defaults; set them as repository variables or secrets if you want to override.
+
+| Variable | Default | Purpose |
+|----------|---------|---------|
+| `MAX_JOBS_PER_RUN` | `5` | Max jobs processed per monitor run |
+| `STATE_PRUNE_DAYS` | `30` | Drop dedupe hashes older than this many days |
+| `STATE_MAX_ENTRIES` | `500` | Cap on dedupe hashes kept in `state/seen_jobs.json` |
+| `RSS_TIMEOUT_SECONDS` | `10` | HTTP timeout per RSS fetch |
+| `LLM_TIMEOUT_SECONDS` | `30` | HTTP timeout per LLM call |
 
 ## Skills Configuration
 

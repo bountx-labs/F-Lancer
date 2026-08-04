@@ -1,6 +1,7 @@
 .env
 .tmp/
 .cache/
+.plans/
 bin/
 *.exe
 

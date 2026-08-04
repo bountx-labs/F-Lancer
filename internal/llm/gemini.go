@@ -34,10 +34,10 @@ type geminiResponse struct {
 	} `json:"candidates"`
 }
 
-func NewGemini(apiKey string) *GeminiProvider {
+func NewGemini(apiKey string, timeout time.Duration) *GeminiProvider {
 	return &GeminiProvider{
 		apiKey: apiKey,
-		client: &http.Client{Timeout: 30 * time.Second},
+		client: &http.Client{Timeout: timeout},
 	}
 }
 

@@ -6,6 +6,9 @@ import (
 	"log"
 	"os"
 	"path/filepath"
+	"strings"
+	"text/template"
+	"time"
 
 	"github.com/bountx-labs/autonomous-freelance-engine/internal/config"
 	"github.com/bountx-labs/autonomous-freelance-engine/internal/executor"
@@ -36,33 +39,50 @@ func main() {
 		baseDir = "."
 	}
 
-	stateDir := filepath.Join(baseDir, "state")
-	if err := os.MkdirAll(stateDir, 0755); err != nil {
-		log.Fatalf("create state dir: %v", err)
-	}
-
 	modelsCfg, err := llm.LoadModelsConfig(filepath.Join(baseDir, "llm-models.json"))
 	if err != nil {
 		log.Fatalf("load models config: %v", err)
 	}
+	if err := modelsCfg.Validate(); err != nil {
+		log.Fatalf("validate models config: %v", err)
+	}
 
-	pool := llm.NewPool(modelsCfg, cfg.GeminiAPIKey, cfg.OpenCodeZenKey, cfg.OpenCodeZenURL, cfg.KiloGatewayKey, cfg.KiloGatewayURL)
+	pool := llm.NewPool(modelsCfg, cfg.GeminiAPIKey, cfg.OpenCodeZenKey, cfg.OpenCodeZenURL,
+		cfg.KiloGatewayKey, cfg.KiloGatewayURL, time.Duration(cfg.LLMTimeoutSeconds)*time.Second)
+
+	tg := notify.NewTelegram(cfg.TelegramBotToken, cfg.TelegramChatID)
 
 	if !pool.IsHealthy() {
-		tg := notify.NewTelegram(cfg.TelegramBotToken, cfg.TelegramChatID)
 		tg.SendAlert("No LLM available. Check API keys.")
 		os.Exit(0)
 	}
-
-	ctx := context.Background()
 
 	skillsReg, err := matcher.LoadRegistry(filepath.Join(baseDir, "skills-registry.json"))
 	if err != nil {
 		log.Fatalf("load skills registry: %v", err)
 	}
+	if err := skillsReg.Validate(); err != nil {
+		log.Fatalf("validate skills registry: %v", err)
+	}
+
+	if cfg.Mode == "setup" {
+		runSetup(pool, skillsReg, baseDir, tg)
+		return
+	}
+
+	runMonitor(cfg, pool, skillsReg, baseDir, tg)
+}
+
+func runMonitor(cfg *config.Config, pool *llm.Pool, skillsReg *matcher.SkillsRegistry, baseDir string, tg *notify.Telegram) {
+	ctx := context.Background()
+
+	stateDir := filepath.Join(baseDir, "state")
+	if err := os.MkdirAll(stateDir, 0755); err != nil {
+		log.Fatalf("create state dir: %v", err)
+	}
 
 	seenPath := filepath.Join(stateDir, "seen_jobs.json")
-	seen, err := state.Load(seenPath)
+	seen, err := state.LoadWithLimits(seenPath, cfg.StatePruneDays, cfg.StateMaxEntries)
 	if err != nil {
 		log.Fatalf("load state: %v", err)
 	}
@@ -76,19 +96,17 @@ func main() {
 	}
 
 	skillRunner := executor.New(os.TempDir())
-	generate := withSkillContext(gen, skillRunner)
-
-	tg := notify.NewTelegram(cfg.TelegramBotToken, cfg.TelegramChatID)
+	generate := withSkillContext(gen, skillRunner, tg)
 
 	jobCount := 0
-	maxJobs := 5
+	maxJobs := cfg.MaxJobsPerRun
 
 	for _, feedURL := range feeds {
 		if jobCount >= maxJobs {
 			break
 		}
 
-		jobs, err := scraper.FetchFeed(feedURL)
+		jobs, err := scraper.FetchFeed(feedURL, time.Duration(cfg.RSSTimeoutSeconds)*time.Second)
 		if err != nil {
 			log.Printf("fetch feed %s: %v", feedURL, err)
 			continue
@@ -120,6 +138,9 @@ func main() {
 				continue
 			}
 
+			// Mark seen only after the alert is fully delivered. SendJobAlert
+			// sends a single message, so a failure here means nothing was sent
+			// and the job simply gets retried without producing duplicates.
 			if err := tg.SendJobAlert(job.Link, prop, guide); err != nil {
 				log.Printf("telegram alert for %s: %v", job.Link, err)
 				continue
@@ -138,12 +159,47 @@ func main() {
 	log.Printf("run complete. processed %d jobs", jobCount)
 }
 
+// runSetup renders prompts/setup-gigs.tmpl through the LLM and writes the
+// generated gig/profile copy to profiles/gig-profiles.md for the workflow to
+// commit. It runs instead of the monitor pipeline when MODE=setup.
+func runSetup(pool *llm.Pool, skillsReg *matcher.SkillsRegistry, baseDir string, tg *notify.Telegram) {
+	profilesDir := filepath.Join(baseDir, "profiles")
+	if err := os.MkdirAll(profilesDir, 0755); err != nil {
+		log.Fatalf("create profiles dir: %v", err)
+	}
+
+	tmpl, err := template.ParseFiles(filepath.Join(baseDir, "prompts", "setup-gigs.tmpl"))
+	if err != nil {
+		log.Fatalf("load setup template: %v", err)
+	}
+
+	var buf strings.Builder
+	if err := tmpl.Execute(&buf, struct{ Skills []matcher.Skill }{Skills: skillsReg.Skills}); err != nil {
+		log.Fatalf("render setup template: %v", err)
+	}
+
+	result, err := pool.Complete(context.Background(), "setup", buf.String())
+	if err != nil {
+		log.Fatalf("generate profiles: %v", err)
+	}
+
+	path := filepath.Join(profilesDir, "gig-profiles.md")
+	if err := os.WriteFile(path, []byte(result), 0644); err != nil {
+		log.Fatalf("write profiles: %v", err)
+	}
+
+	log.Printf("setup complete: wrote %s", path)
+	if err := tg.SendAlert("Setup mode complete - gig profiles generated and committed to profiles/."); err != nil {
+		log.Printf("telegram setup alert failed: %v", err)
+	}
+}
+
 // withSkillContext wraps proposal generation. For each matched skill that
 // declares skills_packages, it installs the package via `npx skills add`,
 // injects the SKILL.md content into the LLM context, then generates the
 // proposal. Failures to install a skill never block the proposal — the job
-// is flagged skill_missing and the pipeline continues.
-func withSkillContext(gen *proposal.Generator, runner *executor.SkillRunner) func(context.Context, scraper.Job, []matcher.MatchResult) (string, error) {
+// is flagged skill_missing, alerted to Telegram, and the pipeline continues.
+func withSkillContext(gen *proposal.Generator, runner *executor.SkillRunner, tg *notify.Telegram) func(context.Context, scraper.Job, []matcher.MatchResult) (string, error) {
 	return func(ctx context.Context, job scraper.Job, matches []matcher.MatchResult) (string, error) {
 		var skillContext string
 
@@ -151,7 +207,12 @@ func withSkillContext(gen *proposal.Generator, runner *executor.SkillRunner) fun
 			for _, pkg := range m.Skill.SkillsPackages {
 				res, err := runner.InstallAndRun(pkg)
 				if err != nil || !res.Success {
-					log.Printf("skill %s install failed for %s: %s", pkg, job.Link, res.Error)
+					errMsg := "unknown error"
+					if res != nil && res.Error != "" {
+						errMsg = res.Error
+					}
+					log.Printf("skill %s install failed for %s: %s", pkg, job.Link, errMsg)
+					tg.SendAlert(fmt.Sprintf("WARNING: Skill %s install failed for %s -- proposal generated without skill context: %s", pkg, job.Link, errMsg))
 					continue
 				}
 				skillContext += "\n\n" + res.SKILLMD

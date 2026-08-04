@@ -40,6 +40,30 @@ func LoadRegistry(path string) (*SkillsRegistry, error) {
 	return &reg, nil
 }
 
+// Validate verifies the registry is well-formed and usable for matching.
+func (r *SkillsRegistry) Validate() error {
+	if len(r.Skills) == 0 {
+		return fmt.Errorf("skills registry: no skills defined")
+	}
+	seen := make(map[string]bool)
+	for _, skill := range r.Skills {
+		if skill.ID == "" || skill.Name == "" {
+			return fmt.Errorf("skills registry: every skill must have id and name")
+		}
+		if seen[skill.ID] {
+			return fmt.Errorf("skills registry: duplicate skill id %q", skill.ID)
+		}
+		seen[skill.ID] = true
+		if len(skill.Keywords) == 0 {
+			return fmt.Errorf("skills registry: skill %q has no keywords", skill.ID)
+		}
+		if skill.Priority < 1 || skill.Priority > 10 {
+			return fmt.Errorf("skills registry: skill %q priority %d out of range 1-10", skill.ID, skill.Priority)
+		}
+	}
+	return nil
+}
+
 func (r *SkillsRegistry) Match(title, description string) []MatchResult {
 	combined := strings.ToLower(title + " " + description)
 	var matches []MatchResult

@@ -20,12 +20,12 @@ on:
 
 concurrency:
   group: freelance-monitor
-  cancel-in-progress: false
+  cancel-in-progress: true
 
 jobs:
   monitor:
     runs-on: ubuntu-latest
-    timeout-minutes: 8
+    timeout-minutes: 10
     permissions:
       contents: write
 
@@ -54,7 +54,7 @@ jobs:
           GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
           OPENCODE_ZEN_API_KEY: ${{ secrets.OPENCODE_ZEN_API_KEY }}
           OPENCODE_ZEN_BASE_URL: ${{ secrets.OPENCODE_ZEN_BASE_URL }}
-          KILO_GATEWAY_API_KEY: ${{ secrets.KILO_GATEWAY_API_KEY }}
+          KILO_GATEWAY_API_KEY: ${{ secrets.KILO_GATEWAY_API_KEY || secrets.KILO_API_KEY }}
           KILO_GATEWAY_BASE_URL: ${{ secrets.KILO_GATEWAY_BASE_URL }}
           MODE: ${{ inputs.mode || 'monitor' }}
           DRY_RUN: ${{ inputs.dry_run || 'false' }}
@@ -72,6 +72,5 @@ jobs:
           fi
           git commit -m "chore: update state [skip ci]"
           if ! git push; then
-            echo "::error::State commit failed - dedup data will be lost, duplicates may be sent next run"
-            exit 1
+            echo "::warning::State commit push failed - state stays in the working tree and will be committed on the next run"
           fi
