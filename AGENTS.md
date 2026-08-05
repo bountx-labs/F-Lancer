@@ -18,7 +18,7 @@ Autonomous freelance monitoring/proposal engine. Go 1.22, pure stdlib (no extern
 ## Gotchas an agent would otherwise miss
 
 - `DRY_RUN=true` does NOT run the pipeline — `main.go` short-circuits and only sends a "Telegram connectivity verified" alert. Use it to test creds, not logic.
-- `MODE=setup` is referenced in `skills-registry.json`/cron workflow/`prompts/setup-gigs.tmpl`, but `main.go` never actually branches on `cfg.Mode` — the setup path is not implemented. Don't assume it works; verify before relying on it.
+- `MODE=setup` is fully implemented in `main.go`. It bypasses the RSS monitor pipeline, renders `prompts/setup-gigs.tmpl` through the LLM, and writes the output to `profiles/gig-profiles.md`. Trigger it via the `cron-monitor.yml` workflow dispatch input.
 - LLM selection is driven by `llm-models.json` `fallback_order` (gemini → opencode → kilo) and per-task model keys (`default`, `proposal`). Adding a task `id` like `setup` means also adding a model entry for it (`pool.pickModel` looks up exact task → else `default`).
 - `Kilo.Healthy()` performs a real generation call ("ping"); the others hit model-list endpoints. So health checks DO consume quota for the kilo provider.
 - Dedupe state: `state/seen_jobs.json` stores SHA1 of job URLs, pruned after 30 days / capped at 500. The cron workflow commits any state/profiles change back with `[skip ci]`; if a state commit fails to push, duplicates get sent next run.

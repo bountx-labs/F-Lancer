@@ -1,8 +1,19 @@
+# Environment
 .env
-.tmp/
-.cache/
-.plans/
-bin/
-*.exe
 
-# state/seen_jobs.json and profiles/ are committed by the workflow on purpose.
+# Build artifacts
+freelance-engine.exe
+freelance-engine
+
+# State (contains seen GUIDs - don't commit)
+seen-state.json
+
+# IDE
+.idea/
+.vscode/
+*.swp
+*.swo
+
+# OS
+.DS_Store
+Thumbs.db
