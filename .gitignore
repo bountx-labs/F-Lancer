@@ -3,7 +3,12 @@
 
 # Build artifacts
 freelance-engine.exe
-freelance-engine
+/freelance-engine
+
+# Temp/cache (local only, never commit)
+.tmp/
+.cache/
+.plans/
 
 # State (contains seen GUIDs - don't commit)
 seen-state.json
