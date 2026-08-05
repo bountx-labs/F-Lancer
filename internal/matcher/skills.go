@@ -95,3 +95,13 @@ func (r *SkillsRegistry) Match(title, description string) []MatchResult {
 func (r *SkillsRegistry) GetFeeds() []string {
 	return r.DefaultFeeds
 }
+
+// Save writes the registry back to disk so strategy mode can persist
+// auto-suggested keywords.
+func (r *SkillsRegistry) Save(path string) error {
+	data, err := json.MarshalIndent(r, "", "  ")
+	if err != nil {
+		return fmt.Errorf("marshal skills registry: %w", err)
+	}
+	return os.WriteFile(path, append(data, '\n'), 0644)
+}

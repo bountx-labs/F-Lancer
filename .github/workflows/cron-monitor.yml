@@ -12,6 +12,7 @@ on:
         options:
           - monitor
           - setup
+          - strategy
       dry_run:
         description: 'Dry run (no real LLM/Telegram)'
         required: false
@@ -69,6 +70,7 @@ jobs:
           # git add and skip the rest (e.g. state/ is absent in setup mode).
           git add state/seen_jobs.json 2>/dev/null || true
           git add profiles/ 2>/dev/null || true
+          git add skills-registry.json 2>/dev/null || true
           if git diff --cached --quiet; then
             echo "No state changes"
             exit 0

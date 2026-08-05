@@ -1,0 +1,28 @@
+You are a freelance market strategist. The engine just scanned live job feeds with the current skills registry.
+
+Current skills:
+{{range .Skills}}- id={{.ID}} | {{.Name}} | keywords: {{range .Keywords}}{{.}}, {{end}}
+{{end}}
+Jobs captured in this scan: {{.Matched}}
+Jobs missed (no keyword matched): {{.Unmatched}}
+
+Per-skill match counts:
+{{range $id, $count := .MatchCount}}- {{$id}}: {{$count}}
+{{end}}
+Sample of missed job titles:
+{{range .MissedTitles}}- {{.}}
+{{end}}
+Tasks:
+1. Identify missed jobs we could realistically deliver.
+2. Decide which EXISTING skills should gain new keywords to capture them. Never invent new skill ids.
+3. Be conservative: maximum 5 new keywords per skill, only keywords that clearly appear in missed jobs.
+
+Response format:
+Part 1 - a Markdown report with sections:
+## Market Analysis
+## Keyword Decisions
+## Profile Guidance
+
+Part 2 - the very last element of the response: one JSON code block fenced with three backticks followed by the word json, nothing after it, exactly this schema:
+{"keyword_additions": [{"skill_id": "existing-skill-id", "keywords": ["new keyword"]}]}
+Use an empty list if no addition is justified.
