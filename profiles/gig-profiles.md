@@ -1,20 +1,20 @@
 ### 1. Fiverr Gig Title
-I will build python web scraper, automation bot and data extraction script
+I will build custom web scraper, python automation script, and api bot
 
 ### 2. Fiverr Gig Description
-Get custom, high-performance web scraping scripts, API integrations, and automation bots tailored to your business needs. With extensive expertise in Python (BeautifulSoup, Selenium, Playwright) and Node.js, I build robust crawlers that bypass restrictions to extract clean data from any website. Whether you need to scrape e-commerce platforms, directory listings, or social media sites, I deliver structured data in CSV, Excel, JSON, or directly to your SQL database.
+Get high-performance web scraping and automation solutions tailored to your business needs. As a seasoned developer proficient in Python (BeautifulSoup, Selenium, Playwright) and Node.js (Puppeteer), I build robust web crawlers, custom API integrations, and automated workflows that extract clean data from any website. You will receive well-structured data in your preferred format (CSV, JSON, Excel, or SQL database) alongside clean, documented source code.
 
-Beyond data extraction, I specialize in automating workflows, building custom Telegram, Discord, and Reddit bots, and setting up automated SEO audits. You will receive well-documented source code, detailed setup instructions, and a ready-to-run automation pipeline. I guarantee a fast 48-hour turnaround, 100% data accuracy, and dedicated post-delivery support to ensure your scripts run flawlessly.
+I specialize in bypassing complex anti-bot systems to ensure seamless, continuous data extraction. Whether you need a simple script or a multi-threaded scraping bot, I guarantee fast turnaround times—often within 24 to 48 hours—and offer dedicated post-delivery support. Message me today to discuss your project requirements and automate your data collection process.
 
 ### 3. Upwork Profile Title
-Python & Node.js Developer | Web Scraping, Automation & Full-Stack Expert
+Full Stack Developer | Python, Node.js, Web Scraping & Automation Expert
 
 ### 4. Upwork Profile Overview
-I am a Full-Stack Developer specializing in custom backend development, high-scale web scraping, and workflow automation. Leveraging the power of Python (Django, Flask, FastAPI) and Node.js (Express, React, Next.js), I help businesses automate repetitive manual tasks, extract high-value web data, and build scalable web applications. My goal is to transform your complex technical bottlenecks into clean, automated, data-driven systems.
+Welcome to your one-stop solution for custom software development, web scraping, and workflow automation. I am a versatile Full Stack Developer specializing in Python and Node.js, dedicated to helping businesses streamline their operations, harvest valuable data, and scale their digital marketing efforts. By combining robust backend engineering with advanced data analysis, I deliver clean, scalable, and highly efficient code that solves your actual business challenges.
 
-I offer comprehensive end-to-end technical services. These include web extraction using Selenium and Playwright, custom API integrations, social media automation bots (Discord, Reddit, Telegram), and advanced data processing using Pandas and SQL. Additionally, I integrate SEO audit methodologies and performance optimization into my development cycle, ensuring your platforms are fast, modern, and search-engine friendly from day one.
+My core services include building advanced web scrapers (using Playwright, Selenium, and Puppeteer), designing custom API integrations, developing automated bots for platforms like Telegram, Discord, and Reddit, and implementing full-stack web applications using React, Next.js, Django, and FastAPI. Additionally, I leverage Python (Pandas), SQL, and Excel to clean and analyze your data, while integrating SEO keyword research and technical audits to boost your digital marketing performance.
 
-Let’s discuss how we can optimize your business workflows and unlock the potential of your data. Click the message button to share your project requirements, and I will provide a step-by-step technical strategy to build your solution.
+I pride myself on clear communication, rapid delivery, and writing maintainable code that grows with your business. Let’s connect to discuss how we can automate your manual workflows, extract the data you need, and elevate your online presence. Click the "Invite" button to start your project today!
 
 ### 5. Suggested Hourly Rate Range
-$35.00 - $75.00 / hour
+$35.00 - $65.00 / hour
