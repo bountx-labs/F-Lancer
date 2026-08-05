@@ -33,3 +33,8 @@ Autonomous freelance monitoring/proposal engine. Go 1.22, pure stdlib (no extern
 - Secrets go in GH Actions secrets (org-level for `bountx-labs`). The kilo provider reads `KILO_GATEWAY_API_KEY` first, then falls back to `KILO_API_KEY` (both code and workflows). Never hardcode/commit API keys; `.env` is gitignored, `state/seen_jobs.json` and `profiles/` are intentionally committed by workflow.
 - All temp/cache/logs must live in-project (`.tmp/` / `.cache/`, gitignored) and be purged before finishing a session; never use global system temp dirs. `.gitignore` already lists `.tmp/` and `.cache/`.
 - Code, comments, commits, docs in English; explanations/planning to the user in Roman Urdu.
+
+## Operating model (user is non-technical)
+- The end user is non-technical. All strategy decisions (target specialties, keywords, gig/profile copy, proposal content, bid suggestions) belong to the LLMs, not the user.
+- The user only performs manual actions software cannot: account creation, pasting/submitting ready-made bids, CAPTCHA/2FA, direct client communication.
+- Future features must reduce user decision-making. Never design flows that require the user to edit JSON, prompts, or code.

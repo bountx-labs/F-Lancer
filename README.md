@@ -101,6 +101,24 @@ go run ./cmd/freelance-engine
 
 Set `DRY_RUN=true` to test Telegram connectivity without real LLM calls.
 
+## Operating Model (Non-Technical User)
+
+This engine is designed for a non-technical user. All intelligence and decision-making is done by LLMs; the user only performs simple manual actions that software cannot do.
+
+**What the LLMs decide and do automatically:**
+- Which job categories/specialties to target and which keywords to use
+- Gig titles, gig descriptions, and profile copy (see `profiles/gig-profiles.md`)
+- Which incoming jobs are worth pursuing
+- The full client-ready proposal and executive guide (including bid amount suggestions)
+
+**What the user does manually (copy-paste only):**
+- Create accounts on Freelancer.com / Fiverr / Upwork (one time)
+- Paste the generated gig/profile copy into those platforms (one time)
+- When a Telegram job alert arrives: open the link, paste the proposal, enter the suggested bid, and submit
+- Forward any client reply to the bot so the LLMs can draft the response
+
+The user never edits skills, prompts, or code, and never writes proposals by hand.
+
 ## License
 
 Copyright (c) 2026. All rights reserved.
