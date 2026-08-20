@@ -163,6 +163,10 @@ func runMonitor(cfg *config.Config, pool *llm.Pool, skillsReg *matcher.SkillsReg
 	log.Printf("run complete. processed %d jobs", jobCount)
 }
 
+// maxSkillContextBytes caps the total injected skill knowledge so a large
+// SKILL.md cannot balloon the LLM prompt past practical limits.
+const maxSkillContextBytes = 64 << 10 // 64 KiB
+
 // withSkillContext wraps proposal generation. For each matched skill that
 // declares skills_packages, it installs the package via `npx skills add`,
 // injects the SKILL.md content into the LLM context, then generates the
@@ -193,7 +197,8 @@ func withSkillContext(gen *proposal.Generator, runner *executor.SkillRunner, tg 
 
 		if skillContext != "" {
 			// Clone job description with skill knowledge appended for LLM context.
-			job.Description += "\n\n--- RELEVANT SKILL KNOWLEDGE ---" + skillContext
+			// Cap the injected context so a large SKILL.md cannot balloon the prompt.
+			job.Description += "\n\n--- RELEVANT SKILL KNOWLEDGE ---" + truncateRunes(skillContext, maxSkillContextBytes)
 		}
 
 		return gen.GenerateProposal(ctx, job, matches)

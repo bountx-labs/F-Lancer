@@ -7,6 +7,7 @@ import (
 	"log"
 	"os"
 	"path/filepath"
+	"regexp"
 	"strings"
 	"text/template"
 	"time"
@@ -17,6 +18,18 @@ import (
 	"github.com/bountx-labs/autonomous-freelance-engine/internal/notify"
 	"github.com/bountx-labs/autonomous-freelance-engine/internal/scraper"
 )
+
+// Caps for strategy-mode keyword additions. The prompt already asks the LLM
+// to be conservative (max 5), but the code enforces it as a safety net against
+// runaway keyword injection.
+const (
+	maxKeywordsPerSkill = 5
+	maxKeywordLength    = 40
+)
+
+// keywordPattern validates keyword characters to block control characters and
+// other unexpected tokens from LLM-generated JSON.
+var keywordPattern = regexp.MustCompile(`^[a-z0-9][a-z0-9 \-_.,&()/+]*$`)
 
 // runSetup renders prompts/setup-gigs.tmpl through the LLM and writes the
 // generated gig/profile copy to profiles/gig-profiles.md for the workflow to
@@ -134,6 +147,7 @@ type keywordAddition struct {
 
 // applyKeywordAdditions merges deduplicated, lowercased keywords from the
 // LLM JSON block into existing skills only. It never creates new skills.
+// Per-skill and per-keyword limits prevent runaway injection from LLM output.
 func applyKeywordAdditions(reg *matcher.SkillsRegistry, jsonBlock string) int {
 	if jsonBlock == "" {
 		return 0
@@ -147,6 +161,7 @@ func applyKeywordAdditions(reg *matcher.SkillsRegistry, jsonBlock string) int {
 	}
 	applied := 0
 	for _, add := range payload.Additions {
+		added := 0
 		for i := range reg.Skills {
 			if reg.Skills[i].ID != add.SkillID {
 				continue
@@ -156,12 +171,20 @@ func applyKeywordAdditions(reg *matcher.SkillsRegistry, jsonBlock string) int {
 				existing[strings.ToLower(strings.TrimSpace(kw))] = true
 			}
 			for _, kw := range add.Keywords {
+				if added >= maxKeywordsPerSkill {
+					continue
+				}
 				kw = strings.ToLower(strings.TrimSpace(kw))
 				if kw == "" || existing[kw] {
 					continue
 				}
+				if len(kw) > maxKeywordLength || !keywordPattern.MatchString(kw) {
+					log.Printf("strategy: skip invalid keyword %q for skill %s", truncateRunes(kw, 20), add.SkillID)
+					continue
+				}
 				reg.Skills[i].Keywords = append(reg.Skills[i].Keywords, kw)
 				existing[kw] = true
+				added++
 				applied++
 			}
 		}
