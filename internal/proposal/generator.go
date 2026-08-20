@@ -3,7 +3,6 @@ package proposal
 import (
 	"context"
 	"fmt"
-	"os"
 	"regexp"
 	"strings"
 	"text/template"
@@ -16,7 +15,7 @@ import (
 var placeholderPattern = regexp.MustCompile(`\[(?:NAME|YOUR|INSERT|TODO|PLACEHOLDER|COMPANY|CLIENT|PROJECT|DATE|BUDGET|TIMELINE|EXPERIENCE|SKILL|RATE|LINK)[^\]]*\]`)
 
 type Generator struct {
-	pool       *llm.Pool
+	pool         *llm.Pool
 	proposalTmpl *template.Template
 	guideTmpl    *template.Template
 }
@@ -103,16 +102,4 @@ func (g *Generator) GenerateGuide(ctx context.Context, job scraper.Job) (string,
 	}
 
 	return result, nil
-}
-
-func ValidateNoPlaceholders(text string) bool {
-	return !placeholderPattern.MatchString(text)
-}
-
-func ReadPromptFile(path string) (string, error) {
-	data, err := os.ReadFile(path)
-	if err != nil {
-		return "", err
-	}
-	return string(data), nil
 }
