@@ -2,13 +2,10 @@ package main
 
 import (
 	"context"
-	"encoding/json"
 	"fmt"
 	"log"
 	"os"
 	"path/filepath"
-	"strings"
-	"text/template"
 	"time"
 
 	"github.com/bountx-labs/autonomous-freelance-engine/internal/config"
