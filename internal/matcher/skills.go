@@ -80,7 +80,7 @@ func (r *SkillsRegistry) Match(title, description string) []MatchResult {
 			}
 		}
 
-	if hitCount > 0 {
+		if hitCount > 0 {
 			score := float64(hitCount) / float64(len(skill.Keywords))
 			matches = append(matches, MatchResult{
 				Skill:    skill,
