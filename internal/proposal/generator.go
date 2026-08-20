@@ -3,6 +3,7 @@ package proposal
 import (
 	"context"
 	"fmt"
+	"path/filepath"
 	"regexp"
 	"strings"
 	"text/template"
@@ -21,12 +22,12 @@ type Generator struct {
 }
 
 func New(pool *llm.Pool, promptsDir string) (*Generator, error) {
-	proposalTmpl, err := template.ParseFiles(promptsDir + "/proposal.tmpl")
+	proposalTmpl, err := template.ParseFiles(filepath.Join(promptsDir, "proposal.tmpl"))
 	if err != nil {
 		return nil, fmt.Errorf("load proposal template: %w", err)
 	}
 
-	guideTmpl, err := template.ParseFiles(promptsDir + "/executive-guide.tmpl")
+	guideTmpl, err := template.ParseFiles(filepath.Join(promptsDir, "executive-guide.tmpl"))
 	if err != nil {
 		return nil, fmt.Errorf("load guide template: %w", err)
 	}

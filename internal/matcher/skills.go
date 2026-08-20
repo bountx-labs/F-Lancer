@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"os"
+	"sort"
 	"strings"
 )
 
@@ -79,7 +80,7 @@ func (r *SkillsRegistry) Match(title, description string) []MatchResult {
 			}
 		}
 
-		if hitCount > 0 {
+	if hitCount > 0 {
 			score := float64(hitCount) / float64(len(skill.Keywords))
 			matches = append(matches, MatchResult{
 				Skill:    skill,
@@ -88,6 +89,14 @@ func (r *SkillsRegistry) Match(title, description string) []MatchResult {
 			})
 		}
 	}
+
+	// Higher-priority skills lead the proposal template; break ties by score.
+	sort.Slice(matches, func(i, j int) bool {
+		if matches[i].Skill.Priority != matches[j].Skill.Priority {
+			return matches[i].Skill.Priority > matches[j].Skill.Priority
+		}
+		return matches[i].Score > matches[j].Score
+	})
 
 	return matches
 }
