@@ -25,10 +25,6 @@ type SeenJobs struct {
 	Hashes     map[string]time.Time `json:"hashes"`
 }
 
-func Load(path string) (*SeenJobs, error) {
-	return LoadWithLimits(path, DefaultPruneDays, DefaultMaxEntries)
-}
-
 func LoadWithLimits(path string, pruneDays, maxEntries int) (*SeenJobs, error) {
 	s := &SeenJobs{
 		path:       path,

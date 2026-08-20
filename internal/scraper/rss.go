@@ -39,18 +39,27 @@ type Job struct {
 	FeedSource  string
 }
 
+// Scraper holds a reused HTTP client so a single instance covers all feed
+// fetches within one engine run without creating a new client per URL.
+type Scraper struct {
+	client *http.Client
+}
+
+// New returns a Scraper whose HTTP client observes the given timeout.
+func New(timeout time.Duration) *Scraper {
+	return &Scraper{client: &http.Client{Timeout: timeout}}
+}
+
 // FetchFeed retrieves and parses an RSS feed, retrying transient network and
 // 5xx/429 failures with exponential backoff.
-func FetchFeed(url string, timeout time.Duration) ([]Job, error) {
-	client := &http.Client{Timeout: timeout}
-
+func (s *Scraper) FetchFeed(url string) ([]Job, error) {
 	var lastErr error
 	for attempt := 0; attempt < 3; attempt++ {
 		if attempt > 0 {
 			time.Sleep(time.Duration(1<<uint(attempt-1)) * time.Second)
 		}
 
-		resp, err := client.Get(url)
+		resp, err := s.client.Get(url)
 		if err != nil {
 			lastErr = fmt.Errorf("fetch %s: %w", url, err)
 			continue

@@ -62,8 +62,9 @@ func runStrategy(cfg *config.Config, pool *llm.Pool, skillsReg *matcher.SkillsRe
 	var matched, unmatched int
 	matchCount := make(map[string]int)
 	var missedTitles []string
+	rss := scraper.New(time.Duration(cfg.RSSTimeoutSeconds) * time.Second)
 	for _, feedURL := range skillsReg.GetFeeds() {
-		jobs, err := scraper.FetchFeed(feedURL, time.Duration(cfg.RSSTimeoutSeconds)*time.Second)
+		jobs, err := rss.FetchFeed(feedURL)
 		if err != nil {
 			log.Printf("fetch feed %s: %v", feedURL, err)
 			continue

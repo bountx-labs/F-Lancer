@@ -103,6 +103,7 @@ func runMonitor(cfg *config.Config, pool *llm.Pool, skillsReg *matcher.SkillsReg
 
 	skillRunner := executor.New(os.TempDir())
 	generate := withSkillContext(gen, skillRunner, tg)
+	rss := scraper.New(time.Duration(cfg.RSSTimeoutSeconds) * time.Second)
 
 	jobCount := 0
 	maxJobs := cfg.MaxJobsPerRun
@@ -112,7 +113,7 @@ func runMonitor(cfg *config.Config, pool *llm.Pool, skillsReg *matcher.SkillsReg
 			break
 		}
 
-		jobs, err := scraper.FetchFeed(feedURL, time.Duration(cfg.RSSTimeoutSeconds)*time.Second)
+		jobs, err := rss.FetchFeed(feedURL)
 		if err != nil {
 			log.Printf("fetch feed %s: %v", feedURL, err)
 			continue
