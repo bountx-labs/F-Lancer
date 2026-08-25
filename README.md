@@ -1,14 +1,14 @@
 # Autonomous Freelance Engine
 
-100% cloud-based, zero-budget, autonomous freelance monitoring and proposal generation engine. Runs entirely inside GitHub Actions on a cron schedule. Telegram delivers ready-to-copy proposals and executive guides.
+100% cloud-based job discovery engine. Runs entirely inside GitHub Actions on a cron schedule. Matched jobs land as markdown briefs in `proposals/inbox/`, where a local AI agent later drafts the proposals for manual submission.
 
 ## How It Works
 
-1. Cron job runs every 5 minutes (or manual dispatch)
+1. Cron job runs every 5 minutes (or manual dispatch, default mode: `inbox`)
 2. Scrapes Freelancer.com RSS feeds for new jobs
 3. Matches jobs against your skills registry
-4. LLM generates a client-ready proposal and executive guide
-5. Delivers 3-block Telegram message: Link → Proposal → Guide
+4. Writes a markdown brief per matched job to `proposals/inbox/<date>/` and commits it
+5. Later, a local agent (e.g. omp) reads new briefs on request, deeply analyzes each job, drafts the client-ready proposal and executive guide, and hands them to the user for final review and upload
 
 ## Quick Setup
 
@@ -98,23 +98,22 @@ go run ./cmd/freelance-engine
 
 Set `DRY_RUN=true` to test Telegram connectivity without real LLM calls.
 
-## Operating Model (Non-Technical User)
+## Operating Model
 
-This engine is designed for a non-technical user. All intelligence and decision-making is done by LLMs; the user only performs simple manual actions that software cannot do.
+The CI pipeline only discovers and filters jobs; proposal intelligence happens locally.
 
-**What the LLMs decide and do automatically:**
-- Which job categories/specialties to target and which keywords to use
-- Gig titles, gig descriptions, and profile copy (see `profiles/gig-profiles.md`)
-- Which incoming jobs are worth pursuing
-- The full client-ready proposal and executive guide (including bid amount suggestions)
+**What CI does automatically:**
+- Scrapes Freelancer.com feeds every 5 minutes
+- Matches jobs against `skills-registry.json`
+- Deduplicates and writes briefs to `proposals/inbox/<date>/` (link, budget, category, description, matched skills)
 
-**What the user does manually (copy-paste only):**
-- Create accounts on Freelancer.com / Fiverr / Upwork (one time)
-- Paste the generated gig/profile copy into those platforms (one time)
-- When a Telegram job alert arrives: open the link, paste the proposal, enter the suggested bid, and submit
-- Forward any client reply to the bot so the LLMs can draft the response
+**What the local agent does when the user asks:**
+- Reads all unread briefs in `proposals/inbox/`
+- Deeply analyzes each job against skill packages
+- Drafts the client-ready proposal and executive guide (including bid amount suggestions)
 
-The user never edits skills, prompts, or code, and never writes proposals by hand.
+**What the user does manually:**
+- Reviews the drafted proposals and submits them on Freelancer.com
 
 ## License
 

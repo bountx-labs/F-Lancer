@@ -36,6 +36,19 @@ func main() {
 	if baseDir == "" {
 		baseDir = "."
 	}
+	skillsReg, err := matcher.LoadRegistry(filepath.Join(baseDir, "skills-registry.json"))
+	if err != nil {
+		log.Fatalf("load skills registry: %v", err)
+	}
+	if err := skillsReg.Validate(); err != nil {
+		log.Fatalf("validate skills registry: %v", err)
+	}
+
+	// Inbox mode needs no LLM and no Telegram; it only writes job briefs.
+	if cfg.Mode == "inbox" {
+		runInbox(cfg, skillsReg, baseDir)
+		return
+	}
 
 	modelsCfg, err := llm.LoadModelsConfig(filepath.Join(baseDir, "llm-models.json"))
 	if err != nil {
@@ -54,15 +67,6 @@ func main() {
 		tg.SendAlert("No LLM available. Check API keys.")
 		os.Exit(0)
 	}
-
-	skillsReg, err := matcher.LoadRegistry(filepath.Join(baseDir, "skills-registry.json"))
-	if err != nil {
-		log.Fatalf("load skills registry: %v", err)
-	}
-	if err := skillsReg.Validate(); err != nil {
-		log.Fatalf("validate skills registry: %v", err)
-	}
-
 	if cfg.Mode == "setup" {
 		runSetup(pool, skillsReg, baseDir, tg)
 		return

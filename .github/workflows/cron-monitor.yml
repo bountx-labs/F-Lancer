@@ -10,6 +10,7 @@ on:
         required: true
         type: choice
         options:
+          - inbox
           - monitor
           - setup
           - strategy
@@ -55,7 +56,7 @@ jobs:
           GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
           KILO_GATEWAY_API_KEY: ${{ secrets.KILO_GATEWAY_API_KEY || secrets.KILO_API_KEY }}
           KILO_GATEWAY_BASE_URL: ${{ secrets.KILO_GATEWAY_BASE_URL }}
-          MODE: ${{ inputs.mode || 'monitor' }}
+          MODE: ${{ inputs.mode || 'inbox' }}
           DRY_RUN: ${{ inputs.dry_run || 'false' }}
         run: go run ./cmd/freelance-engine
 
@@ -67,6 +68,7 @@ jobs:
           # Stage each path separately: one missing path would otherwise abort
           # git add and skip the rest (e.g. state/ is absent in setup mode).
           git add state/seen_jobs.json 2>/dev/null || true
+          git add proposals/inbox/ 2>/dev/null || true
           git add profiles/ 2>/dev/null || true
           git add skills-registry.json 2>/dev/null || true
           if git diff --cached --quiet; then
