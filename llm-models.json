@@ -2,9 +2,9 @@
   "providers": {
     "kilo": {
       "models": {
-        "default": "auto-free",
-        "setup": "auto-free",
-        "proposal": "auto-free"
+        "default": "kilo-auto/free",
+        "setup": "kilo-auto/free",
+        "proposal": "kilo-auto/free"
       }
     },
     "gemini": {
