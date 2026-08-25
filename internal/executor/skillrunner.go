@@ -18,7 +18,7 @@ import (
 const (
 	skillInstallTimeout = 60 * time.Second
 	skillRunTimeout     = 30 * time.Second
-	maxSkillOutputBytes = 64 << 10 // 64 KiB
+	maxSkillOutputBytes = 64 << 10  // 64 KiB
 	maxSkillMDBytes     = 256 << 10 // 256 KiB
 )
 
