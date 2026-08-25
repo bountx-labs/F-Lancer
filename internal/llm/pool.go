@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"log"
 	"os"
 	"time"
 )
@@ -22,7 +23,7 @@ type Pool struct {
 	models    *ModelsConfig
 }
 
-func NewPool(cfg *ModelsConfig, geminiKey, opencodeKey, opencodeURL, kiloKey, kiloURL string, timeout time.Duration) *Pool {
+func NewPool(cfg *ModelsConfig, geminiKey, kiloKey, kiloURL string, timeout time.Duration) *Pool {
 	p := &Pool{
 		providers: make(map[string]Provider),
 		models:    cfg,
@@ -30,9 +31,6 @@ func NewPool(cfg *ModelsConfig, geminiKey, opencodeKey, opencodeURL, kiloKey, ki
 
 	if geminiKey != "" {
 		p.providers["gemini"] = NewGemini(geminiKey, timeout)
-	}
-	if opencodeKey != "" && opencodeURL != "" {
-		p.providers["opencode"] = NewOpenCode(opencodeKey, opencodeURL, timeout)
 	}
 	if kiloKey != "" && kiloURL != "" {
 		p.providers["kilo"] = NewKilo(kiloKey, kiloURL, timeout)
@@ -99,6 +97,7 @@ func (p *Pool) Complete(ctx context.Context, taskProfile string, prompt string) 
 		if err == nil {
 			return result, nil
 		}
+		log.Printf("llm provider %s (model %s) failed: %v", name, model, err)
 	}
 
 	return "", fmt.Errorf("all LLM providers failed")

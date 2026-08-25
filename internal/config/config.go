@@ -8,7 +8,6 @@ import (
 )
 
 const (
-	DefaultOpenCodeZenURL  = "https://opencode.ai/zen/v1"
 	DefaultKiloGatewayURL  = "https://api.kilo.ai/api/gateway"
 	DefaultMaxJobsPerRun   = 5
 	DefaultStatePruneDays  = 30
@@ -21,8 +20,6 @@ type Config struct {
 	TelegramBotToken  string
 	TelegramChatID    string
 	GeminiAPIKey      string
-	OpenCodeZenKey    string
-	OpenCodeZenURL    string
 	KiloGatewayKey    string
 	KiloGatewayURL    string
 	Mode              string
@@ -39,8 +36,6 @@ func Load() (*Config, error) {
 		TelegramBotToken: os.Getenv("TELEGRAM_BOT_TOKEN"),
 		TelegramChatID:   os.Getenv("TELEGRAM_CHAT_ID"),
 		GeminiAPIKey:     os.Getenv("GEMINI_API_KEY"),
-		OpenCodeZenKey:   os.Getenv("OPENCODE_ZEN_API_KEY"),
-		OpenCodeZenURL:   envOrDefault("OPENCODE_ZEN_BASE_URL", DefaultOpenCodeZenURL),
 		KiloGatewayKey:   envOrDefaultFirst("KILO_GATEWAY_API_KEY", "KILO_API_KEY"),
 		KiloGatewayURL:   envOrDefault("KILO_GATEWAY_BASE_URL", DefaultKiloGatewayURL),
 		Mode:             os.Getenv("MODE"),
@@ -113,10 +108,6 @@ func (c *Config) HasGemini() bool {
 	return c.GeminiAPIKey != ""
 }
 
-func (c *Config) HasOpenCodeZen() bool {
-	return c.OpenCodeZenKey != "" && c.OpenCodeZenURL != ""
-}
-
 func (c *Config) HasKiloGateway() bool {
 	return c.KiloGatewayKey != "" && c.KiloGatewayURL != ""
 }
@@ -125,9 +116,6 @@ func (c *Config) AvailableProviders() []string {
 	var providers []string
 	if c.HasGemini() {
 		providers = append(providers, "gemini")
-	}
-	if c.HasOpenCodeZen() {
-		providers = append(providers, "opencode")
 	}
 	if c.HasKiloGateway() {
 		providers = append(providers, "kilo")

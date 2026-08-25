@@ -24,9 +24,6 @@ func main() {
 		{"TELEGRAM_BOT_TOKEN", func() error { return checkTelegram(client, os.Getenv("TELEGRAM_BOT_TOKEN")) }},
 		{"TELEGRAM_CHAT_ID", func() error { return checkChatID(client, os.Getenv("TELEGRAM_BOT_TOKEN"), os.Getenv("TELEGRAM_CHAT_ID")) }},
 		{"GEMINI_API_KEY", func() error { return checkGemini(client, os.Getenv("GEMINI_API_KEY")) }},
-		{"OPENCODE_ZEN_API_KEY", func() error {
-			return checkOpenAICompat(client, os.Getenv("OPENCODE_ZEN_API_KEY"), envOr(os.Getenv("OPENCODE_ZEN_BASE_URL"), "https://opencode.ai/zen/v1"))
-		}},
 		{"KILO_API_KEY", func() error {
 			return checkOpenAICompat(client, firstNonEmpty(os.Getenv("KILO_GATEWAY_API_KEY"), os.Getenv("KILO_API_KEY")), envOr(os.Getenv("KILO_GATEWAY_BASE_URL"), "https://api.kilo.ai/api/gateway"))
 		}},

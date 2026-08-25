@@ -21,9 +21,8 @@
 
 ### 2. Get API Keys
 
-- **Gemini (Primary):** Get a free key from [Google AI Studio](https://aistudio.google.com/apikey)
-- **OpenCode Zen (Optional Fallback):** Get from your provider
-- **Kilo Gateway (Optional Fallback):** Get from your provider
+- **Kilo Gateway (Primary):** Get from your provider
+- **Gemini (Optional Fallback):** Get a free key from [Google AI Studio](https://aistudio.google.com/apikey)
 
 ### 3. Configure Repository Secrets
 
@@ -33,11 +32,9 @@ Go to **Settings → Secrets and variables → Actions** and add:
 |--------|----------|-------------|
 | `TELEGRAM_BOT_TOKEN` | Yes | Token from @BotFather |
 | `TELEGRAM_CHAT_ID` | Yes | Your Telegram chat ID |
-| `GEMINI_API_KEY` | Yes | Google AI Studio API key |
-| `OPENCODE_ZEN_API_KEY` | Optional | Fallback LLM key |
-| `OPENCODE_ZEN_BASE_URL` | Optional | Fallback base URL (defaults to https://opencode.ai/zen/v1) |
-| `KILO_GATEWAY_API_KEY` | Optional | Fallback LLM key (also accepts `KILO_API_KEY`) |
-| `KILO_GATEWAY_BASE_URL` | Optional | Fallback base URL (defaults to https://api.kilo.ai/api/gateway) |
+| `KILO_GATEWAY_API_KEY` | Yes | Kilo Gateway key (also accepts `KILO_API_KEY`) |
+| `KILO_GATEWAY_BASE_URL` | Optional | Base URL (defaults to https://api.kilo.ai/api/gateway) |
+| `GEMINI_API_KEY` | Optional | Fallback LLM key |
 
 ### 4. Verify Setup
 
@@ -84,7 +81,7 @@ Edit `skills-registry.json` to define your skills. Each skill has keywords used 
 ## Architecture
 
 ```
-RSS Feed → Scraper → Deduplication → Skill Matcher → LLM (Gemini/OpenCode/Kilo)
+RSS Feed → Scraper → Deduplication → Skill Matcher → LLM (Kilo/Gemini)
                                                           ↓
                                               Proposal + Executive Guide
                                                           ↓

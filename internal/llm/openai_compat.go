@@ -10,7 +10,7 @@ import (
 )
 
 // openAICompatClient implements the OpenAI-compatible chat completions API
-// shared by both OpenCode and Kilo providers.
+// used by the Kilo provider.
 type openAICompatClient struct {
 	name    string
 	apiKey  string

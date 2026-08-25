@@ -42,8 +42,6 @@ jobs:
           TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
           TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
           GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
-          OPENCODE_ZEN_API_KEY: ${{ secrets.OPENCODE_ZEN_API_KEY }}
-          OPENCODE_ZEN_BASE_URL: ${{ secrets.OPENCODE_ZEN_BASE_URL }}
           KILO_GATEWAY_API_KEY: ${{ secrets.KILO_GATEWAY_API_KEY || secrets.KILO_API_KEY }}
           KILO_GATEWAY_BASE_URL: ${{ secrets.KILO_GATEWAY_BASE_URL }}
           DRY_RUN: 'true'

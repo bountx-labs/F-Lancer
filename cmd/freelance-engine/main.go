@@ -45,7 +45,7 @@ func main() {
 		log.Fatalf("validate models config: %v", err)
 	}
 
-	pool := llm.NewPool(modelsCfg, cfg.GeminiAPIKey, cfg.OpenCodeZenKey, cfg.OpenCodeZenURL,
+	pool := llm.NewPool(modelsCfg, cfg.GeminiAPIKey,
 		cfg.KiloGatewayKey, cfg.KiloGatewayURL, time.Duration(cfg.LLMTimeoutSeconds)*time.Second)
 
 	tg := notify.NewTelegram(cfg.TelegramBotToken, cfg.TelegramChatID)
