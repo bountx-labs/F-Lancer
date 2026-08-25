@@ -1,19 +1,19 @@
 {
   "providers": {
+    "gemini": {
+      "models": {
+        "default": "gemini-3.1-flash-lite,gemini-3.5-flash-lite,gemini-3.5-flash,gemini-3.6-flash,gemini-3.7-flash",
+        "setup": "gemini-3.1-flash-lite,gemini-3.5-flash-lite,gemini-3.5-flash,gemini-3.6-flash,gemini-3.7-flash",
+        "proposal": "gemini-3.1-flash-lite,gemini-3.5-flash-lite,gemini-3.5-flash,gemini-3.6-flash,gemini-3.7-flash"
+      }
+    },
     "kilo": {
       "models": {
         "default": "kilo-auto/free",
         "setup": "kilo-auto/free",
         "proposal": "kilo-auto/free"
       }
-    },
-    "gemini": {
-      "models": {
-        "default": "gemini-3.5-flash-lite",
-        "setup": "gemini-3.1-flash-lite",
-        "proposal": "gemini-3.1-flash-lite"
-      }
     }
   },
-  "fallback_order": ["kilo", "gemini"]
+  "fallback_order": ["gemini", "kilo"]
 }

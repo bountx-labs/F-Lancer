@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"log"
 	"os"
+	"strings"
 	"time"
 )
 
@@ -81,23 +82,14 @@ func (p *Pool) Complete(ctx context.Context, taskProfile string, prompt string) 
 			continue
 		}
 
-		model := p.pickModel(name, taskProfile)
-		if model == "" {
-			continue
+		for _, model := range p.modelsFor(name, taskProfile) {
+			result, err := provider.Complete(ctx, model, prompt)
+			if err == nil {
+				return result, nil
+			}
+			log.Printf("llm provider %s (model %s) failed: %v", name, model, err)
+			time.Sleep(time.Second)
 		}
-
-		result, err := provider.Complete(ctx, model, prompt)
-		if err == nil {
-			return result, nil
-		}
-
-		// Retry the same provider once after a short delay before falling back.
-		time.Sleep(time.Second)
-		result, err = provider.Complete(ctx, model, prompt)
-		if err == nil {
-			return result, nil
-		}
-		log.Printf("llm provider %s (model %s) failed: %v", name, model, err)
 	}
 
 	return "", fmt.Errorf("all LLM providers failed")
@@ -116,19 +108,29 @@ func (p *Pool) IsHealthy() bool {
 	return false
 }
 
-func (p *Pool) pickModel(providerName, taskProfile string) string {
+
+// modelsFor returns the ordered model chain for a provider and task profile.
+// Models may be listed comma-separated; they are tried in order before the
+// pool falls back to the next provider.
+func (p *Pool) modelsFor(providerName, taskProfile string) []string {
 	provCfg, ok := p.models.Providers[providerName]
 	if !ok {
-		return ""
+		return nil
 	}
 
-	if model, ok := provCfg.Models[taskProfile]; ok {
-		return model
+	model, ok := provCfg.Models[taskProfile]
+	if !ok {
+		model = provCfg.Models["default"]
+	}
+	if model == "" {
+		return nil
 	}
 
-	if model, ok := provCfg.Models["default"]; ok {
-		return model
+	var models []string
+	for _, m := range strings.Split(model, ",") {
+		if m = strings.TrimSpace(m); m != "" {
+			models = append(models, m)
+		}
 	}
-
-	return ""
+	return models
 }
