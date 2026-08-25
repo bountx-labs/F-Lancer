@@ -69,7 +69,18 @@ func checkGemini(client *http.Client, key string) error {
 	if key == "" {
 		return fmt.Errorf("not set")
 	}
-	return expectOK(client, "https://generativelanguage.googleapis.com/v1beta/models?key="+key+"&pageSize=1")
+	// The models list endpoint returns 200 for a valid key and 400/403
+	// otherwise. Its payload has no Telegram-style "ok" field, so only the
+	// status code is checked.
+	resp, err := client.Get("https://generativelanguage.googleapis.com/v1beta/models?key=" + key + "&pageSize=1")
+	if err != nil {
+		return err
+	}
+	defer resp.Body.Close()
+	if resp.StatusCode != http.StatusOK {
+		return fmt.Errorf("HTTP %d", resp.StatusCode)
+	}
+	return nil
 }
 
 func checkOpenAICompat(client *http.Client, key, baseURL string) error {
