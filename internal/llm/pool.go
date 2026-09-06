@@ -108,7 +108,6 @@ func (p *Pool) IsHealthy() bool {
 	return false
 }
 
-
 // modelsFor returns the ordered model chain for a provider and task profile.
 // Models may be listed comma-separated; they are tried in order before the
 // pool falls back to the next provider.
