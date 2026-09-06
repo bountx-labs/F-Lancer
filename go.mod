@@ -1,3 +1,3 @@
-module github.com/bountx-labs/autonomous-freelance-engine
+module github.com/bountx-labs/F-Lancer
 
 go 1.22

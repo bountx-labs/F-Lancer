@@ -12,11 +12,11 @@ import (
 	"text/template"
 	"time"
 
-	"github.com/bountx-labs/autonomous-freelance-engine/internal/config"
-	"github.com/bountx-labs/autonomous-freelance-engine/internal/llm"
-	"github.com/bountx-labs/autonomous-freelance-engine/internal/matcher"
-	"github.com/bountx-labs/autonomous-freelance-engine/internal/notify"
-	"github.com/bountx-labs/autonomous-freelance-engine/internal/scraper"
+	"github.com/bountx-labs/F-Lancer/internal/config"
+	"github.com/bountx-labs/F-Lancer/internal/llm"
+	"github.com/bountx-labs/F-Lancer/internal/matcher"
+	"github.com/bountx-labs/F-Lancer/internal/notify"
+	"github.com/bountx-labs/F-Lancer/internal/scraper"
 )
 
 // Caps for strategy-mode keyword additions. The prompt already asks the LLM

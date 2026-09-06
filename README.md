@@ -21,8 +21,8 @@
 
 ### 2. Get API Keys
 
-- **Kilo Gateway (Primary):** Get from your provider
-- **Gemini (Optional Fallback):** Get a free key from [Google AI Studio](https://aistudio.google.com/apikey)
+- **Gemini (Primary):** Get a free key from [Google AI Studio](https://aistudio.google.com/apikey)
+- **Kilo Gateway (Optional Fallback):** Get from your provider
 
 ### 3. Configure Repository Secrets
 
@@ -32,9 +32,9 @@ Go to **Settings → Secrets and variables → Actions** and add:
 |--------|----------|-------------|
 | `TELEGRAM_BOT_TOKEN` | Yes | Token from @BotFather |
 | `TELEGRAM_CHAT_ID` | Yes | Your Telegram chat ID |
-| `KILO_GATEWAY_API_KEY` | Yes | Kilo Gateway key (also accepts `KILO_API_KEY`) |
+| `GEMINI_API_KEY` | Yes | Primary LLM key (free from AI Studio) |
+| `KILO_GATEWAY_API_KEY` | Optional | Fallback LLM key (also accepts `KILO_API_KEY`) |
 | `KILO_GATEWAY_BASE_URL` | Optional | Base URL (defaults to https://api.kilo.ai/api/gateway) |
-| `GEMINI_API_KEY` | Optional | Fallback LLM key |
 
 ### 4. Verify Setup
 
@@ -81,7 +81,7 @@ Edit `skills-registry.json` to define your skills. Each skill has keywords used 
 ## Architecture
 
 ```
-RSS Feed → Scraper → Deduplication → Skill Matcher → LLM (Kilo/Gemini)
+RSS Feed → Scraper → Deduplication → Skill Matcher → LLM (Gemini/Kilo)
                                                           ↓
                                               Proposal + Executive Guide
                                                           ↓
@@ -97,6 +97,16 @@ go run ./cmd/freelance-engine
 ```
 
 Set `DRY_RUN=true` to test Telegram connectivity without real LLM calls.
+
+## LLM Provider Order
+
+The pool tries providers in the order defined in `llm-models.json`:
+
+1. **Gemini** (primary, free tier) - a 5-model fallback chain is tried in order
+2. **Kilo Gateway** (optional fallback, `kilo-auto/free`)
+
+Only providers whose keys are configured are added to the pool. If the Gemini
+key is missing but Kilo is set, the pool uses Kilo alone.
 
 ## Operating Model
 

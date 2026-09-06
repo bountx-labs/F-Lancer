@@ -10,8 +10,8 @@ freelance-engine.exe
 .cache/
 .plans/
 
-# State (contains seen GUIDs - don't commit)
-seen-state.json
+# Local dev state snapshot (if created manually)
+# NOTE: state/seen_jobs.json IS committed on purpose - CI needs it for cross-run dedupe.
 
 # IDE
 .idea/

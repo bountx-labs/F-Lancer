@@ -8,9 +8,9 @@ import (
 	"strings"
 	"text/template"
 
-	"github.com/bountx-labs/autonomous-freelance-engine/internal/llm"
-	"github.com/bountx-labs/autonomous-freelance-engine/internal/matcher"
-	"github.com/bountx-labs/autonomous-freelance-engine/internal/scraper"
+	"github.com/bountx-labs/F-Lancer/internal/llm"
+	"github.com/bountx-labs/F-Lancer/internal/matcher"
+	"github.com/bountx-labs/F-Lancer/internal/scraper"
 )
 
 var placeholderPattern = regexp.MustCompile(`\[(?:NAME|YOUR|INSERT|TODO|PLACEHOLDER|COMPANY|CLIENT|PROJECT|DATE|BUDGET|TIMELINE|EXPERIENCE|SKILL|RATE|LINK)[^\]]*\]`)

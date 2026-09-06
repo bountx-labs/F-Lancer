@@ -18,8 +18,9 @@
 - **Repo:** `bountx-labs/F-Lancer`, branch `main`, working tree clean.
 - **Architecture:**
   `RSS Feed → Scraper → Dedupe → Skill Matcher → LLM (Kilo/Gemini) → Proposal + Guide → Telegram`
-- **LLM pool:** Kilo Gateway primary, Gemini flash-lite fallback.
-  OpenCode Zen provider removed (commit `fbefd9c`). Cleanup 5/5 complete.
+- **LLM pool:** Gemini primary (5-model fallback chain per task),
+  Kilo Gateway fallback (`kilo-auto/free`). OpenCode Zen provider removed
+  (commit `fbefd9c`). Cleanup 5/5 complete.
 - **Workflows:** `cron-monitor` (every 5 min), `smoke-test`, `secrets-check`.
 - **Data:** dedupe state in `state/seen_jobs.json` (prune 30d, cap 500);
   briefs in `proposals/inbox/` for 2026-08-25..28.
@@ -57,18 +58,18 @@
 - [x] Profile generation (setup mode → `profiles/gig-profiles.md`)
 - [x] Secrets check workflow (guard against leaked credentials)
 - [x] Smoke test workflow (Telegram "Engine Test OK")
-- [x] LLM pool cleanup: OpenCode removed, Kilo primary + Gemini fallback
+- [x] LLM pool cleanup: OpenCode removed, Gemini primary + Kilo fallback
+      (order defined in `llm-models.json`)
+- [x] LLM provider error logging: per-provider failures logged in
+      `pool.Complete` (implemented in `fbefd9c`)
 
 ### Known Issues / Next Steps (evidence-based)
 
-- [ ] **Provider error diagnosability** — the LLM pool discards underlying
-      provider errors, so failures report only "all providers failed".
-      Fix: log per-provider errors in `pool.Complete` so the next CI run
-      reveals the actual cause.
 - [ ] **Portfolio sample slides rebuild** — 3 slides were created in a past
       session but never committed and were lost in a Windows refresh.
       Client brief context is preserved in the recovery transcript.
-- [ ] **Inbox backlog** — process unread briefs from 2026-08-25..28.
+- [ ] **Inbox backlog** — process unread briefs from 2026-09-01 onward
+      (briefs from 2026-08-25..31 were archived to `private-recovery/`).
 - [ ] **Proposal outcome tracking** — record which proposals were submitted
       and their results, to tune matching and bids.
 

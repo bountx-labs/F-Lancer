@@ -11,10 +11,10 @@ import (
 	"strings"
 	"time"
 
-	"github.com/bountx-labs/autonomous-freelance-engine/internal/config"
-	"github.com/bountx-labs/autonomous-freelance-engine/internal/matcher"
-	"github.com/bountx-labs/autonomous-freelance-engine/internal/scraper"
-	"github.com/bountx-labs/autonomous-freelance-engine/internal/state"
+	"github.com/bountx-labs/F-Lancer/internal/config"
+	"github.com/bountx-labs/F-Lancer/internal/matcher"
+	"github.com/bountx-labs/F-Lancer/internal/scraper"
+	"github.com/bountx-labs/F-Lancer/internal/state"
 )
 
 // runInbox implements the folder-only delivery mode: matched jobs are written

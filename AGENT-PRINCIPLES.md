@@ -156,10 +156,11 @@ or reduce scope.
 
 ## 7. Known Corrections (from project history)
 
-- **LLM provider errors were discarded.** Past runs reported
-  "all providers failed" without the underlying cause, making
-  diagnosis impossible. Correction: add per-provider error logging
-  in `pool.Complete` so the next CI run reveals the real failure.
+- **LLM provider errors were discarded (RESOLVED).** Past runs reported
+  "all providers failed" without the underlying cause. This was fixed in
+  `fbefd9c` — `pool.Complete` now logs each provider/model failure before
+  falling back. Lesson: never assume a historical analysis reflects the
+  current code; verify against the repo before acting.
 - **Portfolio slides were lost.** Work created in a session but never
   committed is not recoverable from the repo. Correction: anything
   deliverable must be saved into the repo or `private-recovery/`
