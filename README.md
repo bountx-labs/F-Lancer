@@ -8,7 +8,8 @@
 2. Scrapes Freelancer.com RSS feeds for new jobs
 3. Matches jobs against your skills registry
 4. Writes a markdown brief per matched job to `proposals/inbox/<date>/` and commits it
-5. Later, a local agent (e.g. omp) reads new briefs on request, deeply analyzes each job, drafts the client-ready proposal and executive guide, and hands them to the user for final review and upload
+5. The agent later reads new briefs, deeply analyzes each job, and drafts the client-ready proposal and executive guide
+6. Drafted bids are queued in `proposals/drafts/submit-queue.json` and placed automatically by CI (`MODE=submit`, official Freelancer.com API) — zero manual submission
 
 ## Quick Setup
 
@@ -35,6 +36,7 @@ Go to **Settings → Secrets and variables → Actions** and add:
 | `GEMINI_API_KEY` | Yes | Primary LLM key (free from AI Studio) |
 | `KILO_GATEWAY_API_KEY` | Optional | Fallback LLM key (also accepts `KILO_API_KEY`) |
 | `KILO_GATEWAY_BASE_URL` | Optional | Base URL (defaults to https://api.kilo.ai/api/gateway) |
+| `FREELANCER_OAUTH_TOKEN` | Optional (required for auto-submit) | One-time OAuth token from your Freelancer.com developer app — enables `MODE=submit` |
 
 ### 4. Verify Setup
 

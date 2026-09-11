@@ -35,7 +35,7 @@
 |-------|-------|----------------|
 | Discovery | CI (GitHub Actions) | RSS scrape, dedupe, skill match, write briefs |
 | Intelligence | Agent | Read briefs, analyze jobs, draft proposals + guides |
-| Submission | User | Review and submit on Freelancer.com (by design) |
+| Submission | Agent (CI) | Places bids via the official Freelancer.com API (`MODE=submit`) |
 | Monitoring | Agent | CI health, LLM failures, inbox backlog, follow-ups |
 
 ### 3.2 Agent Routine (on request or scheduled check)
@@ -45,8 +45,9 @@
 3. Deep-analyze each job (skills, budget, category, client intent).
 4. Draft client-ready proposal + executive guide (with bid suggestion)
    following `prompts/proposal.tmpl` and `prompts/executive-guide.tmpl`.
-5. Deliver drafts to the user in one batch for review + submission.
-6. Track submitted proposals and follow up on outcomes.
+5. Write approved bids to `proposals/drafts/submit-queue.json` and commit.
+6. Dispatch CI `mode=submit` — bids are placed and confirmed on Telegram.
+7. Track submitted proposals and follow up on outcomes.
 
 ## 4. Roadmap
 
@@ -65,6 +66,11 @@
 
 ### Known Issues / Next Steps (evidence-based)
 
+- [x] Manual bid submission via Freelancer.com API (`MODE=submit`)
+- [ ] **Freelancer OAuth one-time setup** — user supplies the account token
+      (the only unavoidable manual step; account ownership).
+- [ ] **Queue builder** — agent writes `proposals/drafts/submit-queue.json`
+      from drafted briefs (project_id extraction via full-text search API).
 - [ ] **Portfolio sample slides rebuild** — 3 slides were created in a past
       session but never committed and were lost in a Windows refresh.
       Client brief context is preserved in the recovery transcript.
@@ -80,6 +86,8 @@
 - Required: `TELEGRAM_BOT_TOKEN`, `TELEGRAM_CHAT_ID`,
   `KILO_GATEWAY_API_KEY` (also accepts `KILO_API_KEY`).
 - Optional: `KILO_GATEWAY_BASE_URL`, `GEMINI_API_KEY`.
+- Bid submission (optional): `FREELANCER_OAUTH_TOKEN` — one-time OAuth token
+  from a Freelancer.com developer app; required only for `MODE=submit`.
 - Never in source code, never in chat, never in git history.
 - Local `.env` (if ever needed) is gitignored and never committed.
 

@@ -50,6 +50,13 @@ func main() {
 		return
 	}
 
+	// Submit mode needs no LLM: it places queued bids via the Freelancer API.
+	if cfg.Mode == "submit" {
+		tg := notify.NewTelegram(cfg.TelegramBotToken, cfg.TelegramChatID)
+		runSubmit(cfg, baseDir, tg)
+		return
+	}
+
 	modelsCfg, err := llm.LoadModelsConfig(filepath.Join(baseDir, "llm-models.json"))
 	if err != nil {
 		log.Fatalf("load models config: %v", err)

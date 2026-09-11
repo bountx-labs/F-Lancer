@@ -28,13 +28,12 @@ entire system end-to-end; the user is the operator, not the worker.
   for those steps — only fall back to user delegation if the automation
   is technically impossible or unsafe.
 
-### The One Manual Step by Design
+### The Manual Step Now Automated
 
-Freelancer.com proposal submission is the ONLY built-in manual user
-step. It is an account-owner action that cannot be safely automated
-and is part of the project's designed division of labor. The agent
-makes even this step one-click easy: copy-ready proposal text,
-bid suggestion, and a single review point.
+Freelancer.com submission has been automated via the official REST API
+(`MODE=submit`). The agent places bids directly from CI — no browser, no
+login, no manual submission. The only remaining user action is a one-time
+OAuth token setup (account ownership, see README).
 
 ## 2. Concrete Sub-Rules
 
