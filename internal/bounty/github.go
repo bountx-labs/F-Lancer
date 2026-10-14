@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"io"
 	"log"
 	"net/http"
 	"net/url"
@@ -258,6 +259,11 @@ func (g *GitHubScanner) searchLabel(ctx context.Context, label string, perPage i
 	defer resp.Body.Close()
 
 	if resp.StatusCode != http.StatusOK {
+		if resp.StatusCode == http.StatusForbidden || resp.StatusCode == http.StatusUnauthorized {
+			body, _ := io.ReadAll(io.LimitReader(resp.Body, 512))
+			return nil, fmt.Errorf("github search HTTP %d (token present=%t): %s",
+				resp.StatusCode, g.token != "", strings.TrimSpace(string(body)))
+		}
 		return nil, fmt.Errorf("github search HTTP %d", resp.StatusCode)
 	}
 
