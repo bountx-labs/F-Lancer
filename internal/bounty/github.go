@@ -140,10 +140,7 @@ func (g *GitHubScanner) ScanBounties(ctx context.Context, labels []string, limit
 
 			verdict := EvaluateGates(GateInput{
 				Issue:         issue,
-				Repo:          issue.Repository,
-				RepoPushedAt:  meta.PushedAt,
-				RepoArchived:  meta.Archived,
-				RepoIsFork:    meta.Fork,
+				Repo:          meta,
 				PriorAttempts: issue.Comments,
 			})
 			if !verdict.Allowed {

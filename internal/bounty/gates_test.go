@@ -14,9 +14,12 @@ func baseGateInput() GateInput {
 			CreatedAt: time.Now().UTC().Add(-2 * time.Hour).Format(time.RFC3339),
 			Comments:  0,
 		},
-		Repo:         RepoRef{FullName: "good/repo", Stars: 500},
-		RepoPushedAt: time.Now().UTC().Add(-24 * time.Hour),
-		Now:          time.Now().UTC(),
+		Repo: RepoMeta{
+			FullName: "good/repo",
+			Stars:    500,
+			PushedAt: time.Now().UTC().Add(-24 * time.Hour),
+		},
+		Now: time.Now().UTC(),
 	}
 }
 
@@ -46,7 +49,7 @@ func TestGatesRejectMissingAge(t *testing.T) {
 
 func TestGatesRejectArchivedRepo(t *testing.T) {
 	in := baseGateInput()
-	in.RepoArchived = true
+	in.Repo.Archived = true
 	if EvaluateGates(in).Allowed {
 		t.Fatal("expected archived repo to be rejected")
 	}
@@ -54,7 +57,7 @@ func TestGatesRejectArchivedRepo(t *testing.T) {
 
 func TestGatesRejectInactiveRepo(t *testing.T) {
 	in := baseGateInput()
-	in.RepoPushedAt = in.Now.Add(-365 * 24 * time.Hour)
+	in.Repo.PushedAt = in.Now.Add(-365 * 24 * time.Hour)
 	if EvaluateGates(in).Allowed {
 		t.Fatal("expected inactive repo to be rejected")
 	}
@@ -62,7 +65,7 @@ func TestGatesRejectInactiveRepo(t *testing.T) {
 
 func TestGatesRejectUnknownPushDate(t *testing.T) {
 	in := baseGateInput()
-	in.RepoPushedAt = time.Time{}
+	in.Repo.PushedAt = time.Time{}
 	if EvaluateGates(in).Allowed {
 		t.Fatal("expected rejection when push date is unknown")
 	}
@@ -127,7 +130,7 @@ func TestGatesRejectSeedPhraseRequest(t *testing.T) {
 func TestGatesCollectAllReasons(t *testing.T) {
 	in := baseGateInput()
 	in.Repo.Stars = 1
-	in.RepoArchived = true
+	in.Repo.Archived = true
 	in.Issue.Body = "no payment mention here"
 	v := EvaluateGates(in)
 	if v.Allowed {
@@ -143,7 +146,7 @@ func TestGatesUseProvidedNow(t *testing.T) {
 	in := baseGateInput()
 	in.Now = fixed
 	in.Issue.CreatedAt = fixed.Add(-1 * time.Hour).Format(time.RFC3339)
-	in.RepoPushedAt = fixed.Add(-48 * time.Hour)
+	in.Repo.PushedAt = fixed.Add(-48 * time.Hour)
 	if !EvaluateGates(in).Allowed {
 		t.Fatal("expected pass with fixed clock")
 	}

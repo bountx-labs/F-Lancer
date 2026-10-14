@@ -41,12 +41,13 @@ type Verdict struct {
 // GateInput is everything the gates need to judge a candidate. It mixes GitHub
 // metadata with text pulled from the issue so the currency and staleness checks
 // can inspect what a human would read.
+//
+// The repository detail comes from the dedicated repo endpoint, not the search
+// result, because the search payload omits freshness and archive state and can
+// report stale star counts.
 type GateInput struct {
 	Issue         Issue
-	Repo          RepoRef
-	RepoPushedAt  time.Time
-	RepoArchived  bool
-	RepoIsFork    bool
+	Repo          RepoMeta
 	PriorAttempts int
 	Now           time.Time
 }
@@ -116,13 +117,13 @@ func EvaluateGates(in GateInput) Verdict {
 	}
 
 	// Gate 2: maintainer/repo activity. A dead repo never merges a PR.
-	if in.RepoArchived {
+	if in.Repo.Archived {
 		reject("repository is archived")
 	}
-	if in.RepoPushedAt.IsZero() {
+	if in.Repo.PushedAt.IsZero() {
 		reject("repository has no recent push data")
-	} else if now.Sub(in.RepoPushedAt) > MaxRepoInactiveAge {
-		reject("repository inactive for %s (max %s)", roundDuration(now.Sub(in.RepoPushedAt)), MaxRepoInactiveAge)
+	} else if now.Sub(in.Repo.PushedAt) > MaxRepoInactiveAge {
+		reject("repository inactive for %s (max %s)", roundDuration(now.Sub(in.Repo.PushedAt)), MaxRepoInactiveAge)
 	}
 	if in.Repo.Stars < MinRepoStars {
 		reject("repository has only %d stars (min %d); no track record to honour a payout", in.Repo.Stars, MinRepoStars)
