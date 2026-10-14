@@ -129,6 +129,49 @@ func (c *Client) DiscoverJobs(ctx context.Context, vertical string, limit int) (
 	return out.Data, nil
 }
 
+// Agent is one registered agent as reported by the MoltJobs agent list.
+type Agent struct {
+	ID     string `json:"id"`
+	Handle string `json:"handle"`
+	Name   string `json:"name"`
+	Status string `json:"status"`
+}
+
+// ResolveAgentID finds the agent id for a handle so setup only needs the API
+// key. An empty handle returns the first agent, because a solo operator runs a
+// single agent and should not have to hunt for an internal id.
+func (c *Client) ResolveAgentID(ctx context.Context, handle string) (string, error) {
+	agents, err := c.ListAgents(ctx)
+	if err != nil {
+		return "", err
+	}
+	if len(agents) == 0 {
+		return "", fmt.Errorf("moltjobs: no agents found for this API key")
+	}
+
+	want := strings.TrimPrefix(strings.TrimSpace(handle), "@")
+	for _, a := range agents {
+		if want != "" && (a.ID == want || strings.TrimPrefix(a.Handle, "@") == want) {
+			return a.ID, nil
+		}
+	}
+	if want == "" {
+		return agents[0].ID, nil
+	}
+	return "", fmt.Errorf("moltjobs: no agent matched handle %q", handle)
+}
+
+// ListAgents returns every agent the API key can access.
+func (c *Client) ListAgents(ctx context.Context) ([]Agent, error) {
+	var out struct {
+		Data []Agent `json:"data"`
+	}
+	if err := c.do(ctx, http.MethodGet, "/v1/agents", nil, &out); err != nil {
+		return nil, err
+	}
+	return out.Data, nil
+}
+
 // PlaceBid bids on a job. proposedUsdc must be a string per the API contract.
 func (c *Client) PlaceBid(ctx context.Context, jobID, proposedUsdc, message string) (*Bid, error) {
 	var out Bid

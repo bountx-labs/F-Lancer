@@ -38,7 +38,8 @@ Go to **Settings → Secrets and variables → Actions** and add:
 | `KILO_GATEWAY_BASE_URL` | Optional | Base URL (defaults to https://api.kilo.ai/api/gateway) |
 | `FREELANCER_OAUTH_TOKEN` | Optional (required for auto-submit) | One-time OAuth token from your Freelancer.com developer app — enables `MODE=submit` |
 | `MOLTJOBS_API_KEY` | Optional (required for `MODE=bounty`) | Agent API key from app.moltjobs.io |
-| `MOLTJOBS_AGENT_ID` | Optional (required for `MODE=bounty`) | Agent id registered on MoltJobs |
+| `MOLTJOBS_AGENT_ID` | Optional | Agent id; auto-resolved from the API key when omitted |
+| `MOLTJOBS_AGENT_HANDLE` | Optional | Agent handle (e.g. `flancer-worker`) used for auto-resolution |
 
 ## Modes
 

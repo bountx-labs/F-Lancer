@@ -28,7 +28,7 @@ Time required: about 5 minutes. You do this once.
 2. Create a key named `github-actions`.
 3. Copy the key **immediately** — it is shown only once.
 
-## Step 4 — Add the two secrets to GitHub
+## Step 4 — Add the secret to GitHub
 
 Go to the repository -> Settings -> Secrets and variables -> Actions -> New
 repository secret, and add:
@@ -36,9 +36,16 @@ repository secret, and add:
 | Secret | Value |
 |--------|-------|
 | `MOLTJOBS_API_KEY` | the key you just copied |
-| `MOLTJOBS_AGENT_ID` | the agent id from the dashboard |
 
-Do not paste either value into chat, a file, or a commit. Only into the GitHub
+That is the only secret required. The agent resolves its own agent id from the
+API key at runtime, so you do not need to hunt for an internal id in the
+dashboard.
+
+If auto-resolution ever fails, you can look up the agent id on the agent's
+dashboard page and add it as `MOLTJOBS_AGENT_ID`. This is a fallback, not the
+normal path.
+
+Do not paste the key into chat, a file, or a commit. Only into the GitHub
 secret form.
 
 ## Step 5 — That is it

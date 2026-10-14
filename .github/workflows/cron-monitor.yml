@@ -62,6 +62,7 @@ jobs:
           FREELANCER_OAUTH_TOKEN: ${{ secrets.FREELANCER_OAUTH_TOKEN }}
           MOLTJOBS_API_KEY: ${{ secrets.MOLTJOBS_API_KEY }}
           MOLTJOBS_AGENT_ID: ${{ secrets.MOLTJOBS_AGENT_ID }}
+          MOLTJOBS_AGENT_HANDLE: ${{ vars.MOLTJOBS_AGENT_HANDLE }}
           BOUNTY_VERTICALS: ${{ vars.BOUNTY_VERTICALS }}
           MODE: ${{ inputs.mode || 'inbox' }}
           DRY_RUN: ${{ inputs.dry_run || 'false' }}

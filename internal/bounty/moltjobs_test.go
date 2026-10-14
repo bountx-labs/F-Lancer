@@ -115,3 +115,81 @@ func TestAssignedJobsUsesAgentFilter(t *testing.T) {
 		t.Errorf("unexpected query: %q", gotQuery)
 	}
 }
+
+func TestResolveAgentIDByHandle(t *testing.T) {
+	c, srv := newTestClient(t, func(w http.ResponseWriter, r *http.Request) {
+		json.NewEncoder(w).Encode(map[string]any{
+			"data": []map[string]any{
+				{"id": "a1", "handle": "one", "name": "One"},
+				{"id": "a2", "handle": "flancer-worker", "name": "F-Lancer"},
+			},
+		})
+	})
+	defer srv.Close()
+
+	got, err := c.ResolveAgentID(context.Background(), "flancer-worker")
+	if err != nil {
+		t.Fatalf("resolve: %v", err)
+	}
+	if got != "a2" {
+		t.Errorf("expected a2, got %q", got)
+	}
+}
+
+func TestResolveAgentIDAcceptsAtPrefix(t *testing.T) {
+	c, srv := newTestClient(t, func(w http.ResponseWriter, r *http.Request) {
+		json.NewEncoder(w).Encode(map[string]any{
+			"data": []map[string]any{{"id": "a1", "handle": "flancer-worker"}},
+		})
+	})
+	defer srv.Close()
+
+	got, err := c.ResolveAgentID(context.Background(), "@flancer-worker")
+	if err != nil {
+		t.Fatalf("resolve: %v", err)
+	}
+	if got != "a1" {
+		t.Errorf("expected a1, got %q", got)
+	}
+}
+
+func TestResolveAgentIDEmptyHandleReturnsFirst(t *testing.T) {
+	c, srv := newTestClient(t, func(w http.ResponseWriter, r *http.Request) {
+		json.NewEncoder(w).Encode(map[string]any{
+			"data": []map[string]any{{"id": "first"}, {"id": "second"}},
+		})
+	})
+	defer srv.Close()
+
+	got, err := c.ResolveAgentID(context.Background(), "")
+	if err != nil {
+		t.Fatalf("resolve: %v", err)
+	}
+	if got != "first" {
+		t.Errorf("expected first agent, got %q", got)
+	}
+}
+
+func TestResolveAgentIDNoMatch(t *testing.T) {
+	c, srv := newTestClient(t, func(w http.ResponseWriter, r *http.Request) {
+		json.NewEncoder(w).Encode(map[string]any{
+			"data": []map[string]any{{"id": "a1", "handle": "other"}},
+		})
+	})
+	defer srv.Close()
+
+	if _, err := c.ResolveAgentID(context.Background(), "flancer-worker"); err == nil {
+		t.Fatal("expected error when no agent matches the handle")
+	}
+}
+
+func TestResolveAgentIDEmptyList(t *testing.T) {
+	c, srv := newTestClient(t, func(w http.ResponseWriter, r *http.Request) {
+		json.NewEncoder(w).Encode(map[string]any{"data": []map[string]any{}})
+	})
+	defer srv.Close()
+
+	if _, err := c.ResolveAgentID(context.Background(), ""); err == nil {
+		t.Fatal("expected error for an empty agent list")
+	}
+}

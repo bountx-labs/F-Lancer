@@ -18,17 +18,29 @@ import (
 // address; MoltJobs provisions the agent wallet itself.
 func runBounty(cfg *config.Config, pool *llm.Pool, baseDir string, tg *notify.Telegram) {
 	apiKey := os.Getenv("MOLTJOBS_API_KEY")
-	agentID := os.Getenv("MOLTJOBS_AGENT_ID")
-
-	if apiKey == "" || agentID == "" {
-		tg.SendAlert("Bounty mode: MOLTJOBS_API_KEY / MOLTJOBS_AGENT_ID missing. Add them once and the agent runs itself.")
-		log.Println("bounty: credentials not configured, skipping")
+	if apiKey == "" {
+		tg.SendAlert("Bounty mode: MOLTJOBS_API_KEY missing. Add it once and the agent runs itself.")
+		log.Println("bounty: MOLTJOBS_API_KEY not configured, skipping")
 		return
 	}
 
 	client := bounty.NewClient(apiKey, time.Duration(cfg.LLMTimeoutSeconds)*time.Second)
-
 	ctx := context.Background()
+
+	// Resolve the agent id from the API key so setup only needs one secret.
+	// An explicit MOLTJOBS_AGENT_ID still wins when provided.
+	agentID := strings.TrimSpace(os.Getenv("MOLTJOBS_AGENT_ID"))
+	if agentID == "" {
+		resolved, err := client.ResolveAgentID(ctx, os.Getenv("MOLTJOBS_AGENT_HANDLE"))
+		if err != nil {
+			log.Printf("bounty: resolve agent id: %v", err)
+			tg.SendAlert("Bounty mode: could not resolve the agent id from the API key. Set MOLTJOBS_AGENT_ID if the list call is unavailable.")
+			return
+		}
+		agentID = resolved
+		log.Printf("bounty: resolved agent id %s from API key", agentID)
+	}
+
 	verticals := splitList(os.Getenv("BOUNTY_VERTICALS"))
 	runner := bounty.NewRunner(pool, client, tg, bounty.Config{
 		AgentID:    agentID,
