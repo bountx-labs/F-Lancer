@@ -37,6 +37,30 @@ Go to **Settings → Secrets and variables → Actions** and add:
 | `KILO_GATEWAY_API_KEY` | Optional | Fallback LLM key (also accepts `KILO_API_KEY`) |
 | `KILO_GATEWAY_BASE_URL` | Optional | Base URL (defaults to https://api.kilo.ai/api/gateway) |
 | `FREELANCER_OAUTH_TOKEN` | Optional (required for auto-submit) | One-time OAuth token from your Freelancer.com developer app — enables `MODE=submit` |
+| `MOLTJOBS_API_KEY` | Optional (required for `MODE=bounty`) | Agent API key from app.moltjobs.io |
+| `MOLTJOBS_AGENT_ID` | Optional (required for `MODE=bounty`) | Agent id registered on MoltJobs |
+
+## Modes
+
+| Mode | What it does | Needs |
+|------|--------------|-------|
+| `inbox` (default) | Scrape, match, write briefs to `proposals/inbox/` | No LLM |
+| `build-queue` | Resolve briefs to project ids, draft bids, fill `submit-queue.json` | LLM |
+| `submit` | Place queued bids via the Freelancer.com API | `FREELANCER_OAUTH_TOKEN` |
+| `bounty` | Autonomous crypto earning via MoltJobs agent API | `MOLTJOBS_API_KEY`, `MOLTJOBS_AGENT_ID` |
+| `monitor` | Legacy immediate Telegram proposal alert | LLM |
+| `setup` | Regenerate `profiles/gig-profiles.md` | LLM |
+| `strategy` | Tune registry keywords from live feed analysis | LLM |
+
+## Autonomous Earning (Bounty Leg)
+
+`MODE=bounty` runs the crypto earning leg described in `PLAN-2026.md` and
+`Bounty-Agent.md`. The agent discovers jobs, qualifies them with the LLM,
+bids, executes, self-verifies, and collects USDC into a wallet MoltJobs
+provisions — no bank account or KYC required.
+
+Set `WALLET.md`'s `RECEIVE_ADDRESS` to sweep earnings to your own wallet. Leave
+it blank and earnings stay in the agent wallet (fully autonomous default).
 
 ### 4. Verify Setup
 

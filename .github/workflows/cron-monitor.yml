@@ -14,7 +14,9 @@ on:
           - monitor
           - setup
           - strategy
+          - build-queue
           - submit
+          - bounty
       dry_run:
         description: 'Dry run (no real LLM/Telegram)'
         required: false
@@ -58,6 +60,9 @@ jobs:
           KILO_GATEWAY_API_KEY: ${{ secrets.KILO_GATEWAY_API_KEY || secrets.KILO_API_KEY }}
           KILO_GATEWAY_BASE_URL: ${{ secrets.KILO_GATEWAY_BASE_URL }}
           FREELANCER_OAUTH_TOKEN: ${{ secrets.FREELANCER_OAUTH_TOKEN }}
+          MOLTJOBS_API_KEY: ${{ secrets.MOLTJOBS_API_KEY }}
+          MOLTJOBS_AGENT_ID: ${{ secrets.MOLTJOBS_AGENT_ID }}
+          BOUNTY_VERTICALS: ${{ vars.BOUNTY_VERTICALS }}
           MODE: ${{ inputs.mode || 'inbox' }}
           DRY_RUN: ${{ inputs.dry_run || 'false' }}
         run: go run ./cmd/freelance-engine
@@ -74,6 +79,7 @@ jobs:
           git add proposals/drafts/ 2>/dev/null || true
           git add profiles/ 2>/dev/null || true
           git add skills-registry.json 2>/dev/null || true
+          git add bounty/ 2>/dev/null || true
           if git diff --cached --quiet; then
             echo "No state changes"
             exit 0
