@@ -107,6 +107,7 @@ func (g *GitHubScanner) ScanBounties(ctx context.Context, labels []string, limit
 	seen := make(map[string]bool)
 	repoCache := make(map[string]RepoMeta)
 	var out []Issue
+	var searched, searchFailed, unverifiable, gated int
 
 	for _, label := range labels {
 		if len(out) >= limit {
@@ -114,9 +115,11 @@ func (g *GitHubScanner) ScanBounties(ctx context.Context, labels []string, limit
 		}
 		issues, err := g.searchLabel(ctx, label, limit)
 		if err != nil {
-			// One bad label must not stop the scan.
+			searchFailed++
+			log.Printf("bounty: search label %q failed (likely rate limit): %v", label, err)
 			continue
 		}
+		searched += len(issues)
 		for _, issue := range issues {
 			if len(out) >= limit {
 				break
@@ -134,7 +137,8 @@ func (g *GitHubScanner) ScanBounties(ctx context.Context, labels []string, limit
 
 			meta, err := g.repoMeta(ctx, issue.Repository.FullName, repoCache)
 			if err != nil {
-				// Cannot verify the repo means cannot trust the bounty.
+				unverifiable++
+				log.Printf("bounty: cannot verify repo %q: %v", issue.Repository.FullName, err)
 				continue
 			}
 
@@ -144,6 +148,7 @@ func (g *GitHubScanner) ScanBounties(ctx context.Context, labels []string, limit
 				PriorAttempts: issue.Comments,
 			})
 			if !verdict.Allowed {
+				gated++
 				log.Printf("bounty: skip %s -- %s", issue.HTMLURL, verdict)
 				continue
 			}
@@ -152,6 +157,8 @@ func (g *GitHubScanner) ScanBounties(ctx context.Context, labels []string, limit
 		}
 	}
 
+	log.Printf("bounty: scan summary -- searched %d, passed %d, gated %d, unverifiable %d, search errors %d",
+		searched, len(out), gated, unverifiable, searchFailed)
 	return out, nil
 }
 
