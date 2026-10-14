@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"log"
 	"net/http"
 	"net/url"
 	"strconv"
@@ -51,6 +52,20 @@ type RepoRef struct {
 	Stars       int    `json:"stargazers_count"`
 	Language    string `json:"language"`
 	Description string `json:"description"`
+	PushedAt    string `json:"pushed_at"`
+	Archived    bool   `json:"archived"`
+	Fork        bool   `json:"fork"`
+}
+
+// RepoMeta is the repository detail the gates need. The search API returns an
+// abbreviated repo object, so the scanner fetches the full record per repo and
+// caches it to stay within the unauthenticated rate limit.
+type RepoMeta struct {
+	FullName string
+	Stars    int
+	PushedAt time.Time
+	Archived bool
+	Fork     bool
 }
 
 type Label struct {
@@ -77,7 +92,8 @@ var DefaultBountyLabels = []string{
 }
 
 // ScanBounties returns open issues matching any bounty label, newest first,
-// de-duplicated by issue URL. It skips pull requests and already-assigned work.
+// de-duplicated by issue URL. It skips pull requests and already-assigned work,
+// then runs every hard gate so only credible, funded-looking work is returned.
 func (g *GitHubScanner) ScanBounties(ctx context.Context, labels []string, limit int) ([]Issue, error) {
 	if len(labels) == 0 {
 		labels = DefaultBountyLabels
@@ -87,6 +103,7 @@ func (g *GitHubScanner) ScanBounties(ctx context.Context, labels []string, limit
 	}
 
 	seen := make(map[string]bool)
+	repoCache := make(map[string]RepoMeta)
 	var out []Issue
 
 	for _, label := range labels {
@@ -112,11 +129,82 @@ func (g *GitHubScanner) ScanBounties(ctx context.Context, labels []string, limit
 				continue
 			}
 			seen[issue.HTMLURL] = true
+
+			meta, err := g.repoMeta(ctx, issue.Repository.FullName, repoCache)
+			if err != nil {
+				// Cannot verify the repo means cannot trust the bounty.
+				continue
+			}
+
+			verdict := EvaluateGates(GateInput{
+				Issue:         issue,
+				Repo:          issue.Repository,
+				RepoPushedAt:  meta.PushedAt,
+				RepoArchived:  meta.Archived,
+				RepoIsFork:    meta.Fork,
+				PriorAttempts: issue.Comments,
+			})
+			if !verdict.Allowed {
+				log.Printf("bounty: skip %s -- %s", issue.HTMLURL, verdict)
+				continue
+			}
+
 			out = append(out, issue)
 		}
 	}
 
 	return out, nil
+}
+
+// repoMeta fetches and caches repository detail. The search API's repo object
+// omits pushed_at and archived, which the gates require.
+func (g *GitHubScanner) repoMeta(ctx context.Context, fullName string, cache map[string]RepoMeta) (RepoMeta, error) {
+	if m, ok := cache[fullName]; ok {
+		return m, nil
+	}
+	if fullName == "" {
+		return RepoMeta{}, fmt.Errorf("empty repository name")
+	}
+
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, "https://api.github.com/repos/"+fullName, nil)
+	if err != nil {
+		return RepoMeta{}, err
+	}
+	req.Header.Set("Accept", "application/vnd.github+json")
+	if g.token != "" {
+		req.Header.Set("Authorization", "Bearer "+g.token)
+	}
+
+	resp, err := g.client.Do(req)
+	if err != nil {
+		return RepoMeta{}, err
+	}
+	defer resp.Body.Close()
+	if resp.StatusCode != http.StatusOK {
+		return RepoMeta{}, fmt.Errorf("repo %s: HTTP %d", fullName, resp.StatusCode)
+	}
+
+	var raw struct {
+		FullName string `json:"full_name"`
+		Stars    int    `json:"stargazers_count"`
+		PushedAt string `json:"pushed_at"`
+		Archived bool   `json:"archived"`
+		Fork     bool   `json:"fork"`
+	}
+	if err := json.NewDecoder(resp.Body).Decode(&raw); err != nil {
+		return RepoMeta{}, err
+	}
+
+	pushed, _ := time.Parse(time.RFC3339, raw.PushedAt)
+	meta := RepoMeta{
+		FullName: raw.FullName,
+		Stars:    raw.Stars,
+		PushedAt: pushed,
+		Archived: raw.Archived,
+		Fork:     raw.Fork,
+	}
+	cache[fullName] = meta
+	return meta, nil
 }
 
 // searchLabel queries the search API for open, unassigned issues with a label.
