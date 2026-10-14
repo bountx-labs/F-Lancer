@@ -101,6 +101,77 @@ type searchResponse struct {
 	Items      []Issue `json:"items"`
 }
 
+// requestGap throttles calls so GitHub's secondary rate limiter is not
+// tripped. GitHub rejects short bursts even when the hourly quota is fine, so
+// the scanner paces itself between every request.
+const requestGap = 1200 * time.Millisecond
+
+// maxRetries bounds how many times a rate-limited request is retried. Each
+// retry waits longer, so a few attempts cover a short throttling window.
+const maxRetries = 3
+
+// get performs a GET with retry/backoff on rate-limit responses and paces
+// every attempt so the scanner never bursts the API.
+func (g *GitHubScanner) get(ctx context.Context, url string) ([]byte, error) {
+	var lastErr error
+	for attempt := 0; attempt < maxRetries; attempt++ {
+		if attempt > 0 {
+			select {
+			case <-ctx.Done():
+				return nil, ctx.Err()
+			case <-time.After(time.Duration(attempt*attempt) * 3 * time.Second):
+			}
+		}
+
+		req, err := http.NewRequestWithContext(ctx, http.MethodGet, url, nil)
+		if err != nil {
+			return nil, err
+		}
+		req.Header.Set("Accept", "application/vnd.github+json")
+		if g.token != "" {
+			req.Header.Set("Authorization", "Bearer "+g.token)
+		}
+
+		resp, err := g.client.Do(req)
+		if err != nil {
+			lastErr = err
+			continue
+		}
+
+		body, readErr := io.ReadAll(io.LimitReader(resp.Body, 1<<20))
+		resp.Body.Close()
+		if readErr != nil {
+			lastErr = readErr
+			continue
+		}
+
+		// Pace the next request regardless of outcome.
+		select {
+		case <-ctx.Done():
+		case <-time.After(requestGap):
+		}
+
+		if resp.StatusCode == http.StatusOK {
+			return body, nil
+		}
+		if resp.StatusCode == http.StatusTooManyRequests || resp.StatusCode == http.StatusForbidden {
+			lastErr = fmt.Errorf("github HTTP %d (rate limited): %s", resp.StatusCode, truncateBody(body))
+			continue
+		}
+		return nil, fmt.Errorf("github HTTP %d", resp.StatusCode)
+	}
+	return nil, lastErr
+}
+
+// truncateBody keeps an error message short enough for a log line.
+func truncateBody(b []byte) string {
+	s := strings.TrimSpace(string(b))
+	if len(s) > 160 {
+		return s[:160]
+	}
+	return s
+}
+
 // DefaultBountyLabels are the label names bounty platforms and projects use to
 // mark paid, solvable work. The scanner unions these queries, ordered so the
 // most productive label is scanned first when the rate limit is tight.
@@ -192,22 +263,9 @@ func (g *GitHubScanner) repoMeta(ctx context.Context, fullName string, cache map
 		return RepoMeta{}, fmt.Errorf("empty repository name")
 	}
 
-	req, err := http.NewRequestWithContext(ctx, http.MethodGet, g.baseURL+"/repos/"+fullName, nil)
+	body, err := g.get(ctx, g.baseURL+"/repos/"+fullName)
 	if err != nil {
-		return RepoMeta{}, err
-	}
-	req.Header.Set("Accept", "application/vnd.github+json")
-	if g.token != "" {
-		req.Header.Set("Authorization", "Bearer "+g.token)
-	}
-
-	resp, err := g.client.Do(req)
-	if err != nil {
-		return RepoMeta{}, err
-	}
-	defer resp.Body.Close()
-	if resp.StatusCode != http.StatusOK {
-		return RepoMeta{}, fmt.Errorf("repo %s: HTTP %d", fullName, resp.StatusCode)
+		return RepoMeta{}, fmt.Errorf("repo %s: %w", fullName, err)
 	}
 
 	var raw struct {
@@ -217,7 +275,7 @@ func (g *GitHubScanner) repoMeta(ctx context.Context, fullName string, cache map
 		Archived bool   `json:"archived"`
 		Fork     bool   `json:"fork"`
 	}
-	if err := json.NewDecoder(resp.Body).Decode(&raw); err != nil {
+	if err := json.Unmarshal(body, &raw); err != nil {
 		return RepoMeta{}, err
 	}
 
@@ -243,32 +301,13 @@ func (g *GitHubScanner) searchLabel(ctx context.Context, label string, perPage i
 	params.Set("per_page", strconv.Itoa(perPage))
 
 	endpoint := g.baseURL + "/search/issues?" + params.Encode()
-	req, err := http.NewRequestWithContext(ctx, http.MethodGet, endpoint, nil)
+	body, err := g.get(ctx, endpoint)
 	if err != nil {
-		return nil, fmt.Errorf("github search build request: %w", err)
-	}
-	req.Header.Set("Accept", "application/vnd.github+json")
-	if g.token != "" {
-		req.Header.Set("Authorization", "Bearer "+g.token)
-	}
-
-	resp, err := g.client.Do(req)
-	if err != nil {
-		return nil, fmt.Errorf("github search call: %w", err)
-	}
-	defer resp.Body.Close()
-
-	if resp.StatusCode != http.StatusOK {
-		if resp.StatusCode == http.StatusForbidden || resp.StatusCode == http.StatusUnauthorized {
-			body, _ := io.ReadAll(io.LimitReader(resp.Body, 512))
-			return nil, fmt.Errorf("github search HTTP %d (token present=%t): %s",
-				resp.StatusCode, g.token != "", strings.TrimSpace(string(body)))
-		}
-		return nil, fmt.Errorf("github search HTTP %d", resp.StatusCode)
+		return nil, fmt.Errorf("github search: %w", err)
 	}
 
 	var parsed searchResponse
-	if err := json.NewDecoder(resp.Body).Decode(&parsed); err != nil {
+	if err := json.Unmarshal(body, &parsed); err != nil {
 		return nil, fmt.Errorf("github search decode: %w", err)
 	}
 	return parsed.Items, nil
