@@ -148,7 +148,7 @@ func (r *Runner) reportGitHubBounties(ctx context.Context) int {
 		if amt := BountyHint(issue); amt > best {
 			best = amt
 		}
-		log.Printf("bounty: github issue %s (%s) reward~%.0f", issue.HTMLURL, issue.Repository.FullName, BountyHint(issue))
+		log.Printf("bounty: github issue %s (%s) reward~%.0f", issue.HTMLURL, issue.RepoFullName(), BountyHint(issue))
 	}
 	log.Printf("bounty: github scan found %d open bounty issues (best reward hint ~%.0f)", len(issues), best)
 	return len(issues)

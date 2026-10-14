@@ -104,11 +104,11 @@ type searchResponse struct {
 // requestGap throttles calls so GitHub's secondary rate limiter is not
 // tripped. GitHub rejects short bursts even when the hourly quota is fine, so
 // the scanner paces itself between every request.
-const requestGap = 1200 * time.Millisecond
+const requestGap = 2500 * time.Millisecond
 
 // maxRetries bounds how many times a rate-limited request is retried. Each
 // retry waits longer, so a few attempts cover a short throttling window.
-const maxRetries = 3
+const maxRetries = 4
 
 // get performs a GET with retry/backoff on rate-limit responses and paces
 // every attempt so the scanner never bursts the API.
@@ -119,7 +119,7 @@ func (g *GitHubScanner) get(ctx context.Context, url string) ([]byte, error) {
 			select {
 			case <-ctx.Done():
 				return nil, ctx.Err()
-			case <-time.After(time.Duration(attempt*attempt) * 3 * time.Second):
+			case <-time.After(time.Duration(attempt*attempt) * 5 * time.Second):
 			}
 		}
 
