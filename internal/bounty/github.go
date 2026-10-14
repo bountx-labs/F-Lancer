@@ -16,14 +16,16 @@ import (
 // the public search API. No account or token is required, which keeps the agent
 // fully autonomous. An optional token raises the rate limit when one is set.
 type GitHubScanner struct {
-	token  string
-	client *http.Client
+	token   string
+	baseURL string
+	client  *http.Client
 }
 
 func NewGitHubScanner(token string, timeout time.Duration) *GitHubScanner {
 	return &GitHubScanner{
-		token:  token,
-		client: &http.Client{Timeout: timeout},
+		token:   token,
+		baseURL: "https://api.github.com",
+		client:  &http.Client{Timeout: timeout},
 	}
 }
 
@@ -166,7 +168,7 @@ func (g *GitHubScanner) repoMeta(ctx context.Context, fullName string, cache map
 		return RepoMeta{}, fmt.Errorf("empty repository name")
 	}
 
-	req, err := http.NewRequestWithContext(ctx, http.MethodGet, "https://api.github.com/repos/"+fullName, nil)
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, g.baseURL+"/repos/"+fullName, nil)
 	if err != nil {
 		return RepoMeta{}, err
 	}
@@ -216,7 +218,7 @@ func (g *GitHubScanner) searchLabel(ctx context.Context, label string, perPage i
 	params.Set("order", "desc")
 	params.Set("per_page", strconv.Itoa(perPage))
 
-	endpoint := "https://api.github.com/search/issues?" + params.Encode()
+	endpoint := g.baseURL + "/search/issues?" + params.Encode()
 	req, err := http.NewRequestWithContext(ctx, http.MethodGet, endpoint, nil)
 	if err != nil {
 		return nil, fmt.Errorf("github search build request: %w", err)

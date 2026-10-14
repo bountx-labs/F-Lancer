@@ -93,6 +93,7 @@ func newScannerForTest(t *testing.T, status int, body string) (*GitHubScanner, *
 		w.Write([]byte(body))
 	}))
 	s := NewGitHubScanner("", 5*time.Second)
+	s.baseURL = srv.URL
 	s.client = srv.Client()
 	return s, srv
 }
@@ -179,6 +180,7 @@ func TestScanBountiesRejectsLowStarRepo(t *testing.T) {
 	}))
 	defer srv.Close()
 	s := NewGitHubScanner("", 5*time.Second)
+	s.baseURL = srv.URL
 	s.client = srv.Client()
 
 	issues, err := s.ScanBounties(context.Background(), []string{"bounty"}, 10)
@@ -203,6 +205,7 @@ func TestScanBountiesRejectsUnverifiableRepo(t *testing.T) {
 	}))
 	defer srv.Close()
 	s := NewGitHubScanner("", 5*time.Second)
+	s.baseURL = srv.URL
 	s.client = srv.Client()
 
 	issues, err := s.ScanBounties(context.Background(), []string{"bounty"}, 10)
