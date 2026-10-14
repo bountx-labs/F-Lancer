@@ -33,6 +33,7 @@ type Runner struct {
 	evaluator *Evaluator
 	worker    *Worker
 	reporter  Reporter
+	scanner   *GitHubScanner
 	cfg       Config
 }
 
@@ -56,6 +57,12 @@ func NewRunner(pool *llm.Pool, client *Client, reporter Reporter, cfg Config) *R
 	}
 }
 
+// SetScanner attaches the GitHub bounty scanner so a run also reports live
+// crypto bounties beyond the MoltJobs marketplace.
+func (r *Runner) SetScanner(s *GitHubScanner) {
+	r.scanner = s
+}
+
 // Run executes one full cycle and reports what happened. It never returns an
 // error for per-job failures: a single bad job must not stop the pass.
 func (r *Runner) Run(ctx context.Context) {
@@ -69,7 +76,6 @@ func (r *Runner) Run(ctx context.Context) {
 	if len(verticals) == 0 {
 		verticals = DefaultVerticals
 	}
-
 	for _, vertical := range verticals {
 		if bidsPlaced >= r.cfg.MaxBids {
 			break
@@ -111,12 +117,41 @@ func (r *Runner) Run(ctx context.Context) {
 
 	summary := fmt.Sprintf("Bounty run complete. Evaluated: %d, bids placed: %d, completed: %d, failed: %d.",
 		evaluated, bidsPlaced, completed, failed)
+	if scanned := r.reportGitHubBounties(ctx); scanned > 0 {
+		summary += fmt.Sprintf(" GitHub bounties seen: %d.", scanned)
+	}
 	log.Println(summary)
 	if r.reporter != nil {
 		if err := r.reporter.SendAlert(summary); err != nil {
 			log.Printf("bounty: telegram alert failed: %v", err)
 		}
 	}
+}
+
+// reportGitHubBounties scans the public GitHub search API for open, unassigned
+// issues carrying a bounty label and returns how many were found. This is the
+// supply signal the operator needs: it works with no account and no KYC, so it
+// runs even when the MoltJobs marketplace is empty.
+func (r *Runner) reportGitHubBounties(ctx context.Context) int {
+	if r.scanner == nil {
+		return 0
+	}
+
+	issues, err := r.scanner.ScanBounties(ctx, nil, r.cfg.MaxBids*4)
+	if err != nil {
+		log.Printf("bounty: github scan: %v", err)
+		return 0
+	}
+
+	best := 0.0
+	for _, issue := range issues {
+		if amt := BountyHint(issue); amt > best {
+			best = amt
+		}
+		log.Printf("bounty: github issue %s (%s) reward~%.0f", issue.HTMLURL, issue.Repository.FullName, BountyHint(issue))
+	}
+	log.Printf("bounty: github scan found %d open bounty issues (best reward hint ~%.0f)", len(issues), best)
+	return len(issues)
 }
 
 // finishAssigned completes every job currently assigned to the agent.

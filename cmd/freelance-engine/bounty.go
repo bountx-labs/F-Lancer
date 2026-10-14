@@ -51,6 +51,7 @@ func runBounty(cfg *config.Config, pool *llm.Pool, baseDir string, tg *notify.Te
 		MaxBids:    cfg.MaxJobsPerRun,
 		MaxWorkers: 2,
 	})
+	runner.SetScanner(bounty.NewGitHubScanner(os.Getenv("GITHUB_TOKEN"), 15*time.Second))
 	runner.Run(ctx)
 
 	// Sweep earnings only when a receive address is configured.

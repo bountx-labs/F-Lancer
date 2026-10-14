@@ -1,0 +1,202 @@
+package bounty
+
+import (
+	"context"
+	"encoding/json"
+	"fmt"
+	"net/http"
+	"net/url"
+	"strconv"
+	"strings"
+	"time"
+)
+
+// GitHubScanner finds open GitHub issues that carry a bounty label, using only
+// the public search API. No account or token is required, which keeps the agent
+// fully autonomous. An optional token raises the rate limit when one is set.
+type GitHubScanner struct {
+	token  string
+	client *http.Client
+}
+
+func NewGitHubScanner(token string, timeout time.Duration) *GitHubScanner {
+	return &GitHubScanner{
+		token:  token,
+		client: &http.Client{Timeout: timeout},
+	}
+}
+
+// Issue is the subset of a GitHub issue the agent needs to evaluate a bounty.
+type Issue struct {
+	Number      int      `json:"number"`
+	Title       string   `json:"title"`
+	HTMLURL     string   `json:"html_url"`
+	Body        string   `json:"body"`
+	Labels      []Label  `json:"labels"`
+	Repository  RepoRef  `json:"repository"`
+	PullRequest *pullRef `json:"pull_request,omitempty"`
+	Comments    int      `json:"comments"`
+	CreatedAt   string   `json:"created_at"`
+	State       string   `json:"state"`
+	Assignees   []Person `json:"assignees"`
+}
+
+type pullRef struct {
+	URL string `json:"url"`
+}
+
+type RepoRef struct {
+	FullName    string `json:"full_name"`
+	HTMLURL     string `json:"html_url"`
+	Stars       int    `json:"stargazers_count"`
+	Language    string `json:"language"`
+	Description string `json:"description"`
+}
+
+type Label struct {
+	Name string `json:"name"`
+}
+
+type Person struct {
+	Login string `json:"login"`
+}
+
+type searchResponse struct {
+	TotalCount int     `json:"total_count"`
+	Items      []Issue `json:"items"`
+}
+
+// DefaultBountyLabels are the label names bounty platforms and projects use to
+// mark paid, solvable work. The scanner unions these queries.
+var DefaultBountyLabels = []string{
+	"bounty",
+	"💎 Bounty",
+	"bounty-available",
+	"good first issue",
+	"help wanted",
+}
+
+// ScanBounties returns open issues matching any bounty label, newest first,
+// de-duplicated by issue URL. It skips pull requests and already-assigned work.
+func (g *GitHubScanner) ScanBounties(ctx context.Context, labels []string, limit int) ([]Issue, error) {
+	if len(labels) == 0 {
+		labels = DefaultBountyLabels
+	}
+	if limit <= 0 {
+		limit = 20
+	}
+
+	seen := make(map[string]bool)
+	var out []Issue
+
+	for _, label := range labels {
+		if len(out) >= limit {
+			break
+		}
+		issues, err := g.searchLabel(ctx, label, limit)
+		if err != nil {
+			// One bad label must not stop the scan.
+			continue
+		}
+		for _, issue := range issues {
+			if len(out) >= limit {
+				break
+			}
+			if issue.PullRequest != nil {
+				continue
+			}
+			if len(issue.Assignees) > 0 {
+				continue
+			}
+			if seen[issue.HTMLURL] {
+				continue
+			}
+			seen[issue.HTMLURL] = true
+			out = append(out, issue)
+		}
+	}
+
+	return out, nil
+}
+
+// searchLabel queries the search API for open, unassigned issues with a label.
+func (g *GitHubScanner) searchLabel(ctx context.Context, label string, perPage int) ([]Issue, error) {
+	q := fmt.Sprintf(`label:"%s" state:open is:issue no:assignee`, label)
+	params := url.Values{}
+	params.Set("q", q)
+	params.Set("sort", "created")
+	params.Set("order", "desc")
+	params.Set("per_page", strconv.Itoa(perPage))
+
+	endpoint := "https://api.github.com/search/issues?" + params.Encode()
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, endpoint, nil)
+	if err != nil {
+		return nil, fmt.Errorf("github search build request: %w", err)
+	}
+	req.Header.Set("Accept", "application/vnd.github+json")
+	if g.token != "" {
+		req.Header.Set("Authorization", "Bearer "+g.token)
+	}
+
+	resp, err := g.client.Do(req)
+	if err != nil {
+		return nil, fmt.Errorf("github search call: %w", err)
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusOK {
+		return nil, fmt.Errorf("github search HTTP %d", resp.StatusCode)
+	}
+
+	var parsed searchResponse
+	if err := json.NewDecoder(resp.Body).Decode(&parsed); err != nil {
+		return nil, fmt.Errorf("github search decode: %w", err)
+	}
+	return parsed.Items, nil
+}
+
+// BountyHint extracts a dollar amount from an issue's labels or body, so the
+// agent can rank work by expected value. It returns 0 when no amount is found.
+func BountyHint(issue Issue) float64 {
+	for _, l := range issue.Labels {
+		if v := parseAmount(l.Name); v > 0 {
+			return v
+		}
+	}
+	return parseAmount(firstLines(issue.Body, 400))
+}
+
+// parseAmount finds the largest currency-looking number in a string.
+func parseAmount(s string) float64 {
+	var best float64
+	fields := strings.FieldsFunc(s, func(r rune) bool {
+		return !(r >= '0' && r <= '9' || r == '.' || r == '$' || r == ',' || r == 'k' || r == 'K')
+	})
+	for _, f := range fields {
+		f = strings.TrimPrefix(f, "$")
+		f = strings.ReplaceAll(f, ",", "")
+		mult := 1.0
+		if strings.HasSuffix(f, "k") || strings.HasSuffix(f, "K") {
+			mult = 1000
+			f = strings.TrimRight(f, "kK")
+		}
+		v, err := strconv.ParseFloat(f, 64)
+		if err != nil {
+			continue
+		}
+		v *= mult
+		if v > best && v <= 100000 {
+			best = v
+		}
+	}
+	return best
+}
+
+// firstLines returns at most n bytes of the body, so a huge issue cannot slow
+// the scan down.
+func firstLines(body string, n int) string {
+	if len(body) <= n {
+		return body
+	}
+	return body[:n]
+}
