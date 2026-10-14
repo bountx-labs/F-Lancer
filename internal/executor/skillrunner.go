@@ -133,21 +133,24 @@ func boundedOutput(cmd *exec.Cmd) (string, error) {
 	return buf.String(), err
 }
 
-// limitedBuffer drops bytes beyond maxSkillOutputBytes while reporting that
-// it accepted them, so writers never block on a full pipe.
+// limitedBuffer drops bytes beyond maxSkillOutputBytes while reporting every
+// byte as accepted, honoring the io.Writer contract so writers never block on
+// a full pipe.
 type limitedBuffer struct {
 	bytes.Buffer
 }
 
 func (b *limitedBuffer) Write(p []byte) (int, error) {
+	n := len(p)
 	room := maxSkillOutputBytes - b.Len()
 	if room <= 0 {
-		return len(p), nil
+		return n, nil
 	}
 	if len(p) > room {
 		p = p[:room]
 	}
-	return b.Buffer.Write(p)
+	b.Buffer.Write(p)
+	return n, nil
 }
 
 func findSkillMD(root string) string {

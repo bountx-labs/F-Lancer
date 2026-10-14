@@ -64,15 +64,16 @@ func buildEvaluatePrompt(job Job) string {
 	return b.String()
 }
 
-// parseYesNo extracts a verdict from an LLM answer, defaulting to false unless
-// a clear YES is present.
+// parseYesNo extracts a verdict from an LLM answer. A clear NO anywhere wins,
+// so a hedging answer like "YES but NO because..." is treated as a rejection
+// and the agent never bids on work the reviewer doubted.
 func parseYesNo(answer string) bool {
 	upper := strings.ToUpper(strings.TrimSpace(answer))
-	if strings.HasPrefix(upper, "YES") {
-		return true
+	if upper == "" {
+		return false
 	}
-	if strings.Contains(upper, "YES") && !strings.Contains(upper, "NO") {
-		return true
+	if strings.Contains(upper, "NO") {
+		return false
 	}
-	return false
+	return strings.HasPrefix(upper, "YES") || strings.Contains(upper, "YES")
 }
