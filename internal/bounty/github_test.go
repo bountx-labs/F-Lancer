@@ -70,11 +70,23 @@ func TestFirstLinesKeepsShort(t *testing.T) {
 	}
 }
 
+// newScannerForTest serves both the search endpoint and the repo detail
+// endpoint so the gates can run. Issues returned are given a healthy age.
 func newScannerForTest(t *testing.T, status int, body string) (*GitHubScanner, *httptest.Server) {
 	t.Helper()
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		if r.Header.Get("Accept") != "application/vnd.github+json" {
 			t.Errorf("missing github accept header")
+		}
+		if strings.HasPrefix(r.URL.Path, "/repos/") {
+			json.NewEncoder(w).Encode(map[string]any{
+				"full_name":        "good/repo",
+				"stargazers_count": 500,
+				"pushed_at":        time.Now().UTC().Add(-24 * time.Hour).Format(time.RFC3339),
+				"archived":         false,
+				"fork":             false,
+			})
+			return
 		}
 		w.WriteHeader(status)
 		w.Write([]byte(body))
@@ -84,11 +96,25 @@ func newScannerForTest(t *testing.T, status int, body string) (*GitHubScanner, *
 	return s, srv
 }
 
+func freshIssueJSON(number int, url string) map[string]any {
+	return map[string]any{
+		"number":     number,
+		"title":      "Fix the parser",
+		"html_url":   url,
+		"body":       "We pay in USDC on merge.",
+		"created_at": time.Now().UTC().Add(-1 * time.Hour).Format(time.RFC3339),
+		"comments":   0,
+		"repository": map[string]any{"full_name": "good/repo", "stargazers_count": 500},
+	}
+}
+
 func TestScanBountiesSkipsPullRequests(t *testing.T) {
+	pr := freshIssueJSON(2, "https://github.com/a/b/pull/2")
+	pr["pull_request"] = map[string]any{"url": "x"}
 	payload, _ := json.Marshal(map[string]any{
 		"items": []map[string]any{
-			{"number": 1, "title": "Real issue", "html_url": "https://github.com/a/b/issues/1"},
-			{"number": 2, "title": "Is a PR", "html_url": "https://github.com/a/b/pull/2", "pull_request": map[string]any{"url": "x"}},
+			freshIssueJSON(1, "https://github.com/a/b/issues/1"),
+			pr,
 		},
 	})
 	s, srv := newScannerForTest(t, http.StatusOK, string(payload))
@@ -104,11 +130,9 @@ func TestScanBountiesSkipsPullRequests(t *testing.T) {
 }
 
 func TestScanBountiesSkipsAssigned(t *testing.T) {
-	payload, _ := json.Marshal(map[string]any{
-		"items": []map[string]any{
-			{"number": 3, "title": "Taken", "html_url": "https://github.com/a/b/issues/3", "assignees": []map[string]any{{"login": "someone"}}},
-		},
-	})
+	assigned := freshIssueJSON(3, "https://github.com/a/b/issues/3")
+	assigned["assignees"] = []map[string]any{{"login": "someone"}}
+	payload, _ := json.Marshal(map[string]any{"items": []map[string]any{assigned}})
 	s, srv := newScannerForTest(t, http.StatusOK, string(payload))
 	defer srv.Close()
 
@@ -123,9 +147,7 @@ func TestScanBountiesSkipsAssigned(t *testing.T) {
 
 func TestScanBountiesDeduplicates(t *testing.T) {
 	payload, _ := json.Marshal(map[string]any{
-		"items": []map[string]any{
-			{"number": 4, "title": "Dup", "html_url": "https://github.com/a/b/issues/4"},
-		},
+		"items": []map[string]any{freshIssueJSON(4, "https://github.com/a/b/issues/4")},
 	})
 	s, srv := newScannerForTest(t, http.StatusOK, string(payload))
 	defer srv.Close()
@@ -136,6 +158,58 @@ func TestScanBountiesDeduplicates(t *testing.T) {
 	}
 	if len(issues) != 1 {
 		t.Errorf("expected dedup to 1, got %d", len(issues))
+	}
+}
+
+func TestScanBountiesRejectsLowStarRepo(t *testing.T) {
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if strings.HasPrefix(r.URL.Path, "/repos/") {
+			json.NewEncoder(w).Encode(map[string]any{
+				"full_name":        "tiny/repo",
+				"stargazers_count": 2,
+				"pushed_at":        time.Now().UTC().Add(-1 * time.Hour).Format(time.RFC3339),
+			})
+			return
+		}
+		payload, _ := json.Marshal(map[string]any{
+			"items": []map[string]any{freshIssueJSON(9, "https://github.com/tiny/repo/issues/9")},
+		})
+		w.Write(payload)
+	}))
+	defer srv.Close()
+	s := NewGitHubScanner("", 5*time.Second)
+	s.client = srv.Client()
+
+	issues, err := s.ScanBounties(context.Background(), []string{"bounty"}, 10)
+	if err != nil {
+		t.Fatalf("scan: %v", err)
+	}
+	if len(issues) != 0 {
+		t.Errorf("low-star repo bounty should be gated out, got %+v", issues)
+	}
+}
+
+func TestScanBountiesRejectsUnverifiableRepo(t *testing.T) {
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if strings.HasPrefix(r.URL.Path, "/repos/") {
+			w.WriteHeader(http.StatusNotFound)
+			return
+		}
+		payload, _ := json.Marshal(map[string]any{
+			"items": []map[string]any{freshIssueJSON(9, "https://github.com/x/y/issues/9")},
+		})
+		w.Write(payload)
+	}))
+	defer srv.Close()
+	s := NewGitHubScanner("", 5*time.Second)
+	s.client = srv.Client()
+
+	issues, err := s.ScanBounties(context.Background(), []string{"bounty"}, 10)
+	if err != nil {
+		t.Fatalf("scan: %v", err)
+	}
+	if len(issues) != 0 {
+		t.Errorf("unverifiable repo should be gated out, got %+v", issues)
 	}
 }
 
