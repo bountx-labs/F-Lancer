@@ -30,8 +30,8 @@ func NewSearchClient(oauthToken string, timeout time.Duration) *SearchClient {
 // Project is the subset of the Freelancer project payload the queue builder
 // needs. Only stable, documented fields are decoded.
 type Project struct {
-	ID       int64   `json:"id"`
-	Title    string  `json:"title"`
+	ID       int64  `json:"id"`
+	Title    string `json:"title"`
 	Currency struct {
 		Code string `json:"code"`
 	} `json:"currency"`
