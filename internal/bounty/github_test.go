@@ -100,13 +100,13 @@ func newScannerForTest(t *testing.T, status int, body string) (*GitHubScanner, *
 
 func freshIssueJSON(number int, url string) map[string]any {
 	return map[string]any{
-		"number":     number,
-		"title":      "Fix the parser",
-		"html_url":   url,
-		"body":       "We pay in USDC on merge.",
-		"created_at": time.Now().UTC().Add(-1 * time.Hour).Format(time.RFC3339),
-		"comments":   0,
-		"repository": map[string]any{"full_name": "good/repo", "stargazers_count": 500},
+		"number":         number,
+		"title":          "Fix the parser",
+		"html_url":       url,
+		"body":           "We pay in USDC on merge.",
+		"created_at":     time.Now().UTC().Add(-1 * time.Hour).Format(time.RFC3339),
+		"comments":       0,
+		"repository_url": "https://api.github.com/repos/good/repo",
 	}
 }
 
@@ -214,6 +214,29 @@ func TestScanBountiesRejectsUnverifiableRepo(t *testing.T) {
 	}
 	if len(issues) != 0 {
 		t.Errorf("unverifiable repo should be gated out, got %+v", issues)
+	}
+}
+
+func TestRepoFullNameFromURL(t *testing.T) {
+	issue := Issue{RepositoryURL: "https://api.github.com/repos/owner/name"}
+	if got := issue.RepoFullName(); got != "owner/name" {
+		t.Errorf("expected owner/name, got %q", got)
+	}
+}
+
+func TestRepoFullNamePrefersEmbedded(t *testing.T) {
+	issue := Issue{
+		RepositoryURL: "https://api.github.com/repos/from/url",
+		Repository:    RepoRef{FullName: "from/object"},
+	}
+	if got := issue.RepoFullName(); got != "from/object" {
+		t.Errorf("expected the embedded name to win, got %q", got)
+	}
+}
+
+func TestRepoFullNameEmpty(t *testing.T) {
+	if got := (Issue{}).RepoFullName(); got != "" {
+		t.Errorf("expected empty, got %q", got)
 	}
 }
 

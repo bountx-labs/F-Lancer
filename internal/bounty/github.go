@@ -30,18 +30,35 @@ func NewGitHubScanner(token string, timeout time.Duration) *GitHubScanner {
 }
 
 // Issue is the subset of a GitHub issue the agent needs to evaluate a bounty.
+// The search API returns repository_url rather than an embedded repository
+// object, so the repo is derived from that URL.
 type Issue struct {
-	Number      int      `json:"number"`
-	Title       string   `json:"title"`
-	HTMLURL     string   `json:"html_url"`
-	Body        string   `json:"body"`
-	Labels      []Label  `json:"labels"`
-	Repository  RepoRef  `json:"repository"`
-	PullRequest *pullRef `json:"pull_request,omitempty"`
-	Comments    int      `json:"comments"`
-	CreatedAt   string   `json:"created_at"`
-	State       string   `json:"state"`
-	Assignees   []Person `json:"assignees"`
+	Number          int      `json:"number"`
+	Title           string   `json:"title"`
+	HTMLURL         string   `json:"html_url"`
+	Body            string   `json:"body"`
+	Labels          []Label  `json:"labels"`
+	RepositoryURL   string   `json:"repository_url"`
+	Repository      RepoRef  `json:"repository"`
+	PullRequest     *pullRef `json:"pull_request,omitempty"`
+	Comments        int      `json:"comments"`
+	CreatedAt       string   `json:"created_at"`
+	State           string   `json:"state"`
+	Assignees       []Person `json:"assignees"`
+}
+
+// RepoFullName returns the owner/name for the issue, preferring the embedded
+// repository object and falling back to parsing repository_url, which is what
+// the search API actually returns.
+func (i Issue) RepoFullName() string {
+	if i.Repository.FullName != "" {
+		return i.Repository.FullName
+	}
+	const marker = "/repos/"
+	if idx := strings.Index(i.RepositoryURL, marker); idx >= 0 {
+		return strings.Trim(i.RepositoryURL[idx+len(marker):], "/")
+	}
+	return ""
 }
 
 type pullRef struct {
@@ -135,10 +152,11 @@ func (g *GitHubScanner) ScanBounties(ctx context.Context, labels []string, limit
 			}
 			seen[issue.HTMLURL] = true
 
-			meta, err := g.repoMeta(ctx, issue.Repository.FullName, repoCache)
+			fullName := issue.RepoFullName()
+			meta, err := g.repoMeta(ctx, fullName, repoCache)
 			if err != nil {
 				unverifiable++
-				log.Printf("bounty: cannot verify repo %q: %v", issue.Repository.FullName, err)
+				log.Printf("bounty: cannot verify repo %q: %v", fullName, err)
 				continue
 			}
 
