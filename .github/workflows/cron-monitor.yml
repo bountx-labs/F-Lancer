@@ -66,6 +66,7 @@ jobs:
           MOLTJOBS_AGENT_HANDLE: ${{ vars.MOLTJOBS_AGENT_HANDLE }}
           BOUNTY_VERTICALS: ${{ vars.BOUNTY_VERTICALS }}
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          BOUNTY_GITHUB_TOKEN: ${{ secrets.BOUNTY_GITHUB_TOKEN }}
           MODE: ${{ inputs.mode || 'inbox' }}
           DRY_RUN: ${{ inputs.dry_run || 'false' }}
         run: go run ./cmd/freelance-engine

@@ -51,7 +51,7 @@ func runBounty(cfg *config.Config, pool *llm.Pool, baseDir string, tg *notify.Te
 		MaxBids:    cfg.MaxJobsPerRun,
 		MaxWorkers: 2,
 	})
-	runner.SetScanner(bounty.NewGitHubScanner(os.Getenv("GITHUB_TOKEN"), 15*time.Second))
+	runner.SetScanner(bounty.NewGitHubScanner(githubToken(), 15*time.Second))
 	runner.Run(ctx)
 
 	// Sweep earnings only when a receive address is configured.
@@ -97,4 +97,16 @@ func splitList(v string) []string {
 		}
 	}
 	return out
+}
+
+// githubToken returns the best available token for the public search API.
+// A dedicated token raises the rate limit enough to scan every bounty label;
+// the default workflow token is used only as a last resort.
+func githubToken() string {
+	for _, key := range []string{"BOUNTY_GITHUB_TOKEN", "GITHUB_TOKEN"} {
+		if v := strings.TrimSpace(os.Getenv(key)); v != "" {
+			return v
+		}
+	}
+	return ""
 }

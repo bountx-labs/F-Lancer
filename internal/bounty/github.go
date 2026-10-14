@@ -101,11 +101,12 @@ type searchResponse struct {
 }
 
 // DefaultBountyLabels are the label names bounty platforms and projects use to
-// mark paid, solvable work. The scanner unions these queries.
+// mark paid, solvable work. The scanner unions these queries, ordered so the
+// most productive label is scanned first when the rate limit is tight.
 var DefaultBountyLabels = []string{
 	"bounty",
-	"💎 Bounty",
 	"bounty-available",
+	"💎 Bounty",
 	"good first issue",
 	"help wanted",
 }
