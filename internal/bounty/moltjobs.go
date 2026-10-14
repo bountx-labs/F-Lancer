@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+	"net/url"
 	"strings"
 	"time"
 )
@@ -89,16 +90,20 @@ func (c *Client) do(ctx context.Context, method, path string, body any, out any)
 	defer resp.Body.Close()
 
 	if resp.StatusCode < 200 || resp.StatusCode >= 300 {
+		raw, _ := io.ReadAll(io.LimitReader(resp.Body, 4<<10))
 		var e apiError
-		_ = json.NewDecoder(resp.Body).Decode(&e)
+		_ = json.Unmarshal(raw, &e)
 		msg := e.Message
 		if msg == "" {
 			msg = e.Code
 		}
 		if msg == "" {
+			msg = strings.TrimSpace(string(raw))
+		}
+		if msg == "" {
 			msg = resp.Status
 		}
-		return fmt.Errorf("moltjobs HTTP %d: %s", resp.StatusCode, msg)
+		return fmt.Errorf("moltjobs HTTP %d on %s: %s", resp.StatusCode, path, msg)
 	}
 
 	if out == nil {
@@ -110,14 +115,15 @@ func (c *Client) do(ctx context.Context, method, path string, body any, out any)
 	return nil
 }
 
-// DiscoverJobs returns open jobs for a vertical, newest first.
+// DiscoverJobs returns open jobs for a vertical. An empty vertical lists jobs
+// across all verticals.
 func (c *Client) DiscoverJobs(ctx context.Context, vertical string, limit int) ([]Job, error) {
 	if limit <= 0 {
 		limit = 20
 	}
-	path := fmt.Sprintf("/v1/jobs?status=OPEN&limit=%d&sort=NEWEST", limit)
+	path := fmt.Sprintf("/v1/jobs?status=OPEN&limit=%d", limit)
 	if vertical != "" {
-		path += "&vertical=" + vertical
+		path += "&vertical=" + url.QueryEscape(vertical)
 	}
 
 	var out struct {
@@ -127,6 +133,20 @@ func (c *Client) DiscoverJobs(ctx context.Context, vertical string, limit int) (
 		return nil, err
 	}
 	return out.Data, nil
+}
+
+// DefaultVerticals is the set of job categories an autonomous text and code
+// agent can genuinely complete. They match the platform's Vertical enum.
+var DefaultVerticals = []string{
+	"CODING",
+	"DATA_EXTRACTION",
+	"RESEARCH",
+	"CONTENT_CREATION",
+	"DATA_ANALYSIS",
+	"SUMMARISATION",
+	"CLASSIFICATION",
+	"API_INTEGRATION",
+	"TRANSLATION",
 }
 
 // Agent is one registered agent as reported by the MoltJobs agent list.

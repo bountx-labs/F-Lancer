@@ -42,6 +42,9 @@ func runBounty(cfg *config.Config, pool *llm.Pool, baseDir string, tg *notify.Te
 	}
 
 	verticals := splitList(os.Getenv("BOUNTY_VERTICALS"))
+	if len(verticals) == 0 {
+		verticals = bounty.DefaultVerticals
+	}
 	runner := bounty.NewRunner(pool, client, tg, bounty.Config{
 		AgentID:    agentID,
 		Verticals:  verticals,

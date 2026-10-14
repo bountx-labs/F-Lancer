@@ -41,6 +41,41 @@ func TestDiscoverJobsParsesResponse(t *testing.T) {
 	}
 }
 
+func TestDiscoverJobsOmitsVerticalWhenEmpty(t *testing.T) {
+	var gotQuery string
+	c, srv := newTestClient(t, func(w http.ResponseWriter, r *http.Request) {
+		gotQuery = r.URL.RawQuery
+		json.NewEncoder(w).Encode(map[string]any{"data": []map[string]any{}})
+	})
+	defer srv.Close()
+
+	if _, err := c.DiscoverJobs(context.Background(), "", 5); err != nil {
+		t.Fatalf("discover: %v", err)
+	}
+	if strings.Contains(gotQuery, "vertical=") {
+		t.Errorf("vertical should be omitted when empty, got %q", gotQuery)
+	}
+	if !strings.Contains(gotQuery, "status=OPEN") {
+		t.Errorf("status filter missing, got %q", gotQuery)
+	}
+}
+
+func TestDiscoverJobsEncodesVertical(t *testing.T) {
+	var gotQuery string
+	c, srv := newTestClient(t, func(w http.ResponseWriter, r *http.Request) {
+		gotQuery = r.URL.RawQuery
+		json.NewEncoder(w).Encode(map[string]any{"data": []map[string]any{}})
+	})
+	defer srv.Close()
+
+	if _, err := c.DiscoverJobs(context.Background(), "CODING", 5); err != nil {
+		t.Fatalf("discover: %v", err)
+	}
+	if !strings.Contains(gotQuery, "vertical=CODING") {
+		t.Errorf("vertical filter missing, got %q", gotQuery)
+	}
+}
+
 func TestPlaceBidSendsStringAmount(t *testing.T) {
 	var captured map[string]any
 	c, srv := newTestClient(t, func(w http.ResponseWriter, r *http.Request) {

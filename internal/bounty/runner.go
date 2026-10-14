@@ -67,7 +67,7 @@ func (r *Runner) Run(ctx context.Context) {
 	bidsPlaced, evaluated := 0, 0
 	verticals := r.cfg.Verticals
 	if len(verticals) == 0 {
-		verticals = []string{""}
+		verticals = DefaultVerticals
 	}
 
 	for _, vertical := range verticals {
