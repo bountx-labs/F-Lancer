@@ -2,6 +2,7 @@ package main
 
 import (
 	"context"
+	"fmt"
 	"log"
 	"os"
 	"path/filepath"
@@ -106,4 +107,46 @@ func runMonitor(cfg *config.Config, pool *llm.Pool, skillsReg *matcher.SkillsReg
 	}
 
 	log.Printf("run complete. processed %d jobs", jobCount)
+}
+
+// maxSkillContextBytes caps the total injected skill knowledge so a large
+// SKILL.md cannot balloon the LLM prompt past practical limits.
+const maxSkillContextBytes = 64 << 10 // 64 KiB
+
+// withSkillContext wraps proposal generation. For each matched skill that
+// declares skills_packages, it installs the package via `npx skills add`,
+// injects the SKILL.md content into the LLM context, then generates the
+// proposal. Failures to install a skill never block the proposal - the job
+// is flagged skill_missing, alerted to Telegram, and the pipeline continues.
+func withSkillContext(gen *proposal.Generator, runner *executor.SkillRunner, tg *notify.Telegram) func(context.Context, scraper.Job, []matcher.MatchResult) (string, error) {
+	return func(ctx context.Context, job scraper.Job, matches []matcher.MatchResult) (string, error) {
+		var skillContext string
+
+		for _, m := range matches {
+			for _, pkg := range m.Skill.SkillsPackages {
+				res, err := runner.InstallAndRun(pkg)
+				if err != nil || !res.Success {
+					errMsg := "unknown error"
+					if res != nil && res.Error != "" {
+						errMsg = res.Error
+					}
+					log.Printf("skill %s install failed for %s: %s", pkg, job.Link, errMsg)
+					tg.SendAlert(fmt.Sprintf("WARNING: Skill %s install failed for %s -- proposal generated without skill context: %s", pkg, job.Link, errMsg))
+					continue
+				}
+				skillContext += "\n\n" + res.SKILLMD
+				if res.Artifact != "" {
+					skillContext += "\nSample run output:\n" + res.Artifact
+				}
+			}
+		}
+
+		if skillContext != "" {
+			// Clone job description with skill knowledge appended for LLM context.
+			// Cap the injected context so a large SKILL.md cannot balloon the prompt.
+			job.Description += "\n\n--- RELEVANT SKILL KNOWLEDGE ---" + truncateRunes(skillContext, maxSkillContextBytes)
+		}
+
+		return gen.GenerateProposal(ctx, job, matches)
+	}
 }
