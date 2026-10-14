@@ -135,6 +135,13 @@ func EvaluateGates(in GateInput) Verdict {
 		reject("no recognised payout method mentioned (need one of: %s)", strings.Join(KnownGoodRails[:6], ", "))
 	}
 
+	// Gate 3b: a paid label must be present. GitHub's "good first issue" and
+	// "help wanted" labels mean "please contribute"; they carry no reward, so
+	// work matched only through them cannot pay anything.
+	if !HasPaidLabel(in.Issue.Labels) {
+		reject("no paid bounty label present; matched only contribution labels")
+	}
+
 	// Gate 4: competition. Work already engaged by others is likely taken.
 	if in.PriorAttempts >= MaxPriorEngagement {
 		reject("%d prior attempts already recorded", in.PriorAttempts)
@@ -157,6 +164,25 @@ func EvaluateGates(in GateInput) Verdict {
 	}
 
 	return v
+}
+
+// HasPaidLabel reports whether any label marks the issue as paid work.
+// Contribution-only labels such as "good first issue" and "help wanted" do not
+// count, because they never carry a reward.
+func HasPaidLabel(labels []Label) bool {
+	for _, l := range labels {
+		name := strings.ToLower(strings.TrimSpace(l.Name))
+		for _, paid := range PaidBountyLabels {
+			if name == strings.ToLower(paid) {
+				return true
+			}
+		}
+		// Labels that embed an amount, e.g. "$250" or "bounty: $500".
+		if strings.Contains(name, "bounty") || strings.Contains(name, "$") {
+			return true
+		}
+	}
+	return false
 }
 
 // mentionsKnownRail reports whether any trusted payment method appears.

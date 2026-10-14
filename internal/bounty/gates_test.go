@@ -13,6 +13,7 @@ func baseGateInput() GateInput {
 			HTMLURL:   "https://github.com/good/repo/issues/1",
 			CreatedAt: time.Now().UTC().Add(-2 * time.Hour).Format(time.RFC3339),
 			Comments:  0,
+			Labels:    []Label{{Name: "bounty"}},
 		},
 		Repo: RepoMeta{
 			FullName: "good/repo",
@@ -159,5 +160,47 @@ func TestVerdictString(t *testing.T) {
 	v := Verdict{Allowed: false, Reasons: []string{"one"}}
 	if got := v.String(); got == "" {
 		t.Error("reject verdict should render reasons")
+	}
+}
+
+func TestHasPaidLabel(t *testing.T) {
+	tests := []struct {
+		labels []Label
+		want   bool
+	}{
+		{[]Label{{Name: "bounty"}}, true},
+		{[]Label{{Name: "Bounty"}}, true},
+		{[]Label{{Name: "bounty-available"}}, true},
+		{[]Label{{Name: "💎 Bounty"}}, true},
+		{[]Label{{Name: "$250"}}, true},
+		{[]Label{{Name: "bounty: $500"}}, true},
+		{[]Label{{Name: "good first issue"}}, false},
+		{[]Label{{Name: "help wanted"}}, false},
+		{[]Label{{Name: "refactor"}}, false},
+		{[]Label{{Name: "rust"}}, false},
+		{nil, false},
+	}
+	for _, tc := range tests {
+		if got := HasPaidLabel(tc.labels); got != tc.want {
+			t.Errorf("HasPaidLabel(%v) = %v, want %v", tc.labels, got, tc.want)
+		}
+	}
+}
+
+func TestGatesRejectContributionLabelOnly(t *testing.T) {
+	in := baseGateInput()
+	in.Issue.Labels = []Label{{Name: "good first issue"}, {Name: "help wanted"}, {Name: "rust"}}
+	in.Issue.Body = "Contribution welcome. Paid in USDC."
+	v := EvaluateGates(in)
+	if v.Allowed {
+		t.Fatal("contribution-only labels must be rejected even when a rail is named")
+	}
+}
+
+func TestGatesAcceptAmountInLabel(t *testing.T) {
+	in := baseGateInput()
+	in.Issue.Labels = []Label{{Name: "$250"}}
+	if !EvaluateGates(in).Allowed {
+		t.Fatal("a label carrying an amount should count as paid")
 	}
 }

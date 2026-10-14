@@ -104,6 +104,7 @@ func freshIssueJSON(number int, url string) map[string]any {
 		"title":          "Fix the parser",
 		"html_url":       url,
 		"body":           "We pay in USDC on merge.",
+		"labels":         []map[string]any{{"name": "bounty"}},
 		"created_at":     time.Now().UTC().Add(-1 * time.Hour).Format(time.RFC3339),
 		"comments":       0,
 		"repository_url": "https://api.github.com/repos/good/repo",

@@ -172,16 +172,27 @@ func truncateBody(b []byte) string {
 	return s
 }
 
-// DefaultBountyLabels are the label names bounty platforms and projects use to
-// mark paid, solvable work. The scanner unions these queries, ordered so the
-// most productive label is scanned first when the rate limit is tight.
-var DefaultBountyLabels = []string{
+// PaidBountyLabels mark work that carries a real reward. Only these labels can
+// lead to a payout, so a scan that finds nothing here has found no paying work
+// even if it matched hundreds of general contribution labels.
+var PaidBountyLabels = []string{
 	"bounty",
 	"bounty-available",
 	"💎 Bounty",
+	"algora",
+	"opire",
+}
+
+// ContributionLabels are GitHub's standard "please help" labels. They are not
+// paid work: no reward is attached, so an autonomous earning agent must never
+// treat them as a bounty. Kept for reference and future opt-in use.
+var ContributionLabels = []string{
 	"good first issue",
 	"help wanted",
 }
+
+// DefaultBountyLabels is what the scanner searches. It is the paid set only.
+var DefaultBountyLabels = PaidBountyLabels
 
 // ScanBounties returns open issues matching any bounty label, newest first,
 // de-duplicated by issue URL. It skips pull requests and already-assigned work,
