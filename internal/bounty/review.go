@@ -52,10 +52,10 @@ func (h *ReviewHandler) PendingReviews(ctx context.Context, login string) ([]Ope
 
 	var out struct {
 		Items []struct {
-			Number      int    `json:"number"`
-			Title       string `json:"title"`
-			HTMLURL     string `json:"html_url"`
-			Repository  struct {
+			Number     int    `json:"number"`
+			Title      string `json:"title"`
+			HTMLURL    string `json:"html_url"`
+			Repository struct {
 				FullName string `json:"full_name"`
 			} `json:"repository"`
 			RepositoryURL string `json:"repository_url"`

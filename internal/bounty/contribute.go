@@ -223,7 +223,7 @@ func (c *Contributor) ReviewComments(ctx context.Context, repo string, number in
 	var out []ReviewComment
 
 	var reviews []struct {
-		ID   int64  `json:"id"`
+		ID   int64 `json:"id"`
 		User struct {
 			Login string `json:"login"`
 		} `json:"user"`
@@ -239,7 +239,7 @@ func (c *Contributor) ReviewComments(ctx context.Context, repo string, number in
 	}
 
 	var inline []struct {
-		ID   int64  `json:"id"`
+		ID   int64 `json:"id"`
 		User struct {
 			Login string `json:"login"`
 		} `json:"user"`
