@@ -218,6 +218,12 @@ var ContributionLabels = []string{
 // DefaultBountyLabels is what the scanner searches. It is the paid set only.
 var DefaultBountyLabels = PaidBountyLabels
 
+// searchPageSize is how many issues one label query fetches. GitHub caps this
+// at 100. It is far larger than the number of bounties acted on, because the
+// pages are ordered newest first and a small page would stop before reaching
+// genuinely fresh work.
+const searchPageSize = 100
+
 // ScanBounties returns open issues matching any bounty label, newest first,
 // de-duplicated by issue URL. It skips pull requests, already-assigned work,
 // and anything already evaluated, then runs every hard gate so only credible,
@@ -240,7 +246,13 @@ func (g *GitHubScanner) ScanBounties(ctx context.Context, labels []string, limit
 	var searched, searchFailed, alreadySeen int
 
 	for _, label := range labels {
-		issues, err := g.searchLabel(ctx, label, limit)
+		// The page size is deliberately decoupled from the result limit. The
+		// result limit caps how many bounties the agent acts on, while the
+		// page size decides how far back it looks. Sizing the page to the
+		// result limit meant a fresh bounty sitting past the twentieth
+		// result was never even fetched, which is how a genuinely live bounty
+		// was missed while the agent saw nothing but stale leftovers.
+		issues, err := g.searchLabel(ctx, label, searchPageSize)
 		if err != nil {
 			searchFailed++
 			log.Printf("bounty: search label %q failed (likely rate limit): %v", label, err)

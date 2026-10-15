@@ -192,7 +192,10 @@ func (r *Runner) reportGitHubBounties(ctx context.Context) int {
 		return 0
 	}
 
-	issues, err := r.scanner.ScanBounties(ctx, nil, r.cfg.MaxBids*4)
+	// The limit is how many qualifying bounties the agent may act on, not how
+	// many issues to look at. The scanner pages far deeper and applies gates
+	// itself, so a small action limit no longer hides fresh work.
+	issues, err := r.scanner.ScanBounties(ctx, nil, r.cfg.MaxBids)
 	if err != nil {
 		log.Printf("bounty: github scan: %v", err)
 		return 0
