@@ -25,6 +25,14 @@ type GitHubScanner struct {
 	pace time.Duration
 	// attempts overrides the retry count; zero means use the default.
 	attempts int
+	// seenStore remembers evaluated issues so a fast poll skips repeats.
+	seenStore *SeenStore
+}
+
+// SetSeenStore attaches the dedupe store that lets the scanner run frequently
+// without re-processing the same issues on every cycle.
+func (g *GitHubScanner) SetSeenStore(s *SeenStore) {
+	g.seenStore = s
 }
 
 func NewGitHubScanner(token string, timeout time.Duration) *GitHubScanner {
@@ -211,8 +219,13 @@ var ContributionLabels = []string{
 var DefaultBountyLabels = PaidBountyLabels
 
 // ScanBounties returns open issues matching any bounty label, newest first,
-// de-duplicated by issue URL. It skips pull requests and already-assigned work,
-// then runs every hard gate so only credible, funded-looking work is returned.
+// de-duplicated by issue URL. It skips pull requests, already-assigned work,
+// and anything already evaluated, then runs every hard gate so only credible,
+// freshly posted work is returned.
+//
+// The freshness ordering matters more than the filtering: funded bounties are
+// claimed within hours, so the newest issue is the only one with a real chance
+// of still being open. Older survivors are usually the leftover bait.
 func (g *GitHubScanner) ScanBounties(ctx context.Context, labels []string, limit int) ([]Issue, error) {
 	if len(labels) == 0 {
 		labels = DefaultBountyLabels
@@ -223,13 +236,10 @@ func (g *GitHubScanner) ScanBounties(ctx context.Context, labels []string, limit
 
 	seen := make(map[string]bool)
 	repoCache := make(map[string]RepoMeta)
-	var out []Issue
-	var searched, searchFailed, unverifiable, gated int
+	var candidates []Issue
+	var searched, searchFailed, alreadySeen int
 
 	for _, label := range labels {
-		if len(out) >= limit {
-			break
-		}
 		issues, err := g.searchLabel(ctx, label, limit)
 		if err != nil {
 			searchFailed++
@@ -238,9 +248,6 @@ func (g *GitHubScanner) ScanBounties(ctx context.Context, labels []string, limit
 		}
 		searched += len(issues)
 		for _, issue := range issues {
-			if len(out) >= limit {
-				break
-			}
 			if issue.PullRequest != nil {
 				continue
 			}
@@ -252,31 +259,73 @@ func (g *GitHubScanner) ScanBounties(ctx context.Context, labels []string, limit
 			}
 			seen[issue.HTMLURL] = true
 
-			fullName := issue.RepoFullName()
-			meta, err := g.repoMeta(ctx, fullName, repoCache)
-			if err != nil {
-				unverifiable++
-				log.Printf("bounty: cannot verify repo %q: %v", fullName, err)
-				continue
+			// Skip anything already evaluated on an earlier cycle so a fast
+			// poll does not spend its budget re-reading known issues.
+			if g.seenStore != nil {
+				key := IssueKey(issue.RepoFullName(), issue.Number)
+				if g.seenStore.Has(key) {
+					alreadySeen++
+					continue
+				}
 			}
 
-			verdict := EvaluateGates(GateInput{
-				Issue:         issue,
-				Repo:          meta,
-				PriorAttempts: issue.Comments,
-			})
-			if !verdict.Allowed {
-				gated++
-				log.Printf("bounty: skip %s -- %s", issue.HTMLURL, verdict)
-				continue
-			}
-
-			out = append(out, issue)
+			candidates = append(candidates, issue)
 		}
 	}
 
-	log.Printf("bounty: scan summary -- searched %d, passed %d, gated %d, unverifiable %d, search errors %d",
-		searched, len(out), gated, unverifiable, searchFailed)
+	// Newest first: attempt the freshest bounties before anything older.
+	SortByFreshness(candidates)
+
+	now := time.Now().UTC()
+	var out []Issue
+	var gated, unverifiable, outsideWindow int
+
+	for _, issue := range candidates {
+		if len(out) >= limit {
+			break
+		}
+
+		fullName := issue.RepoFullName()
+		key := IssueKey(fullName, issue.Number)
+
+		// A chance-of-winning check runs before the expensive repo lookup:
+		// anything past the race window is already lost.
+		if within, age := WithinRaceWindow(issue.CreatedAt, now); !within {
+			outsideWindow++
+			log.Printf("bounty: skip %s#%d -- posted %s ago, past the %s race window",
+				fullName, issue.Number, age.Round(time.Minute), RaceWindow)
+			if g.seenStore != nil {
+				g.seenStore.Mark(key)
+			}
+			continue
+		}
+
+		meta, err := g.repoMeta(ctx, fullName, repoCache)
+		if err != nil {
+			unverifiable++
+			log.Printf("bounty: cannot verify repo %q: %v", fullName, err)
+			continue
+		}
+
+		verdict := EvaluateGates(GateInput{
+			Issue:         issue,
+			Repo:          meta,
+			PriorAttempts: issue.Comments,
+		})
+		if !verdict.Allowed {
+			gated++
+			log.Printf("bounty: skip %s -- %s", issue.HTMLURL, verdict)
+			if g.seenStore != nil {
+				g.seenStore.Mark(key)
+			}
+			continue
+		}
+
+		out = append(out, issue)
+	}
+
+	log.Printf("bounty: scan summary -- searched %d, fresh %d, passed %d, gated %d, outside window %d, already seen %d, unverifiable %d, search errors %d",
+		searched, len(candidates), len(out), gated, outsideWindow, alreadySeen, unverifiable, searchFailed)
 	return out, nil
 }
 

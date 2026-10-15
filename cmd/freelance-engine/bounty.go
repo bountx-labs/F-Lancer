@@ -5,6 +5,8 @@ import (
 	"fmt"
 	"log"
 	"os"
+	"path/filepath"
+	"strconv"
 	"strings"
 	"time"
 
@@ -46,16 +48,39 @@ func runBounty(cfg *config.Config, pool *llm.Pool, baseDir string, tg *notify.Te
 	if len(verticals) == 0 {
 		verticals = bounty.DefaultVerticals
 	}
+
+	// The bounty loop runs often and dedupe skips what it already saw, so a
+	// wider per-run budget costs little and raises the odds of catching a
+	// freshly posted bounty before it is taken.
+	maxBids := cfg.MaxJobsPerRun
+	if env := strings.TrimSpace(os.Getenv("BOUNTY_MAX_PER_RUN")); env != "" {
+		if n, err := strconv.Atoi(env); err == nil && n > 0 {
+			maxBids = n
+		}
+	}
+
 	runner := bounty.NewRunner(pool, client, tg, bounty.Config{
 		AgentID:    agentID,
 		Verticals:  verticals,
-		MaxBids:    cfg.MaxJobsPerRun,
+		MaxBids:    maxBids,
 		MaxWorkers: 2,
 	})
-	runner.SetScanner(bounty.NewGitHubScanner(githubToken(), 15*time.Second))
+	scanner := bounty.NewGitHubScanner(githubToken(), 15*time.Second)
+	if store, err := bounty.NewSeenStore(filepath.Join(baseDir, "state", "bounty_seen.json")); err != nil {
+		log.Printf("bounty: seen store unavailable: %v", err)
+	} else {
+		store.Prune(7 * 24 * time.Hour)
+		scanner.SetSeenStore(store)
+		defer func() {
+			if err := store.Save(); err != nil {
+				log.Printf("bounty: save seen store: %v", err)
+			}
+		}()
+	}
+
+	runner.SetScanner(scanner)
 	runner.SetContributor(bounty.NewContributor(githubPRToken(), 15*time.Second))
 	runner.Run(ctx)
-
 	// Sweep earnings only when a receive address is configured.
 	sweep(ctx, client, agentID, baseDir, tg)
 }

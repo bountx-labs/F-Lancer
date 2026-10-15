@@ -2,7 +2,12 @@ name: Cron Monitor
 
 on:
   schedule:
+    # Inbox discovery every 5 minutes.
     - cron: '*/5 * * * *'
+    # Bounty scanning every 2 minutes. Funded bounties are claimed within
+    # hours, so a tighter loop is the difference between seeing live work and
+    # only ever seeing the leftovers.
+    - cron: '*/2 * * * *'
   workflow_dispatch:
     inputs:
       mode:
@@ -69,9 +74,24 @@ jobs:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           BOUNTY_GITHUB_TOKEN: ${{ secrets.BOUNTY_GITHUB_TOKEN }}
           PR_GITHUB_TOKEN: ${{ secrets.PR_GITHUB_TOKEN }}
-          MODE: ${{ inputs.mode || 'inbox' }}
+          SCHEDULE_MODE: ${{ github.event.schedule }}
+          INPUT_MODE: ${{ inputs.mode }}
           DRY_RUN: ${{ inputs.dry_run || 'false' }}
-        run: go run ./cmd/freelance-engine
+        run: |
+          # A scheduled run has no inputs, so pick the mode from the schedule
+          # that fired. The 2-minute schedule is the bounty race loop; the
+          # 5-minute schedule is inbox discovery.
+          MODE="$INPUT_MODE"
+          if [ -z "$MODE" ]; then
+            if [ "$SCHEDULE_MODE" = "*/2 * * * *" ]; then
+              MODE="bounty"
+            else
+              MODE="inbox"
+            fi
+          fi
+          echo "Running with MODE=$MODE"
+          export MODE
+          go run ./cmd/freelance-engine
 
       - name: Commit state
         if: always()
