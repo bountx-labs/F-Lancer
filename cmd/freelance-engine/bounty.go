@@ -87,13 +87,14 @@ func runBountyProbe(cfg *config.Config, baseDir string, tg *notify.Telegram) {
 	const probeRepo = "mxsm/rocketmq-rust"
 	const probeNumber = 11546
 
-	issue := bounty.Issue{
-		Number:        probeNumber,
-		Title:         "probe",
-		RepositoryURL: "https://api.github.com/repos/" + probeRepo,
+	fetched, err := contributor.FetchIssue(ctx, probeRepo, probeNumber)
+	if err != nil {
+		log.Printf("bounty-probe: fetch issue failed: %v", err)
+		tg.SendAlert("Bounty probe failed fetching the issue: " + err.Error())
+		return
 	}
 
-	targets := bounty.TargetFilesForProbe(issue)
+	targets := bounty.TargetFilesForProbe(*fetched)
 	log.Printf("bounty-probe: issue %s#%d lists %d target files", probeRepo, probeNumber, len(targets))
 	if len(targets) == 0 {
 		log.Println("bounty-probe: no target files parsed")

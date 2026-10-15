@@ -203,6 +203,18 @@ func (c *Contributor) createBranch(ctx context.Context, repo, branch, from strin
 	}, nil)
 }
 
+// FetchIssue reads a single issue so its body, labels, and metadata are
+// available without the search API.
+func (c *Contributor) FetchIssue(ctx context.Context, repo string, number int) (*Issue, error) {
+	path := fmt.Sprintf("/repos/%s/issues/%d", repo, number)
+	var out Issue
+	if err := c.api(ctx, http.MethodGet, path, nil, &out); err != nil {
+		return nil, err
+	}
+	out.RepositoryURL = "https://api.github.com/repos/" + repo
+	return &out, nil
+}
+
 // CommentOnIssue posts a comment on an issue. Bounty programs often require a
 // claim comment before a pull request, so this is how the agent announces
 // intent without any interactive step.
