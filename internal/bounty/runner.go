@@ -104,6 +104,17 @@ func (r *Runner) handleReviews(ctx context.Context) {
 		}
 		log.Printf("bounty: review: addressed feedback on %s#%d", pull.Repo, pull.Number)
 	}
+
+	// Clean up abandoned work last, so a pull request that still has feedback
+	// is always answered before anything is closed.
+	if closed, err := r.reviews.CleanOrphans(ctx, login); err != nil {
+		log.Printf("bounty: orphan cleanup failed: %v", err)
+	} else if closed > 0 {
+		log.Printf("bounty: closed %d stale pull request(s)", closed)
+		if r.reporter != nil {
+			r.reporter.SendAlert(fmt.Sprintf("Closed %d stale pull request(s) to keep the account clean.", closed))
+		}
+	}
 }
 
 // Run executes one full cycle and reports what happened. It never returns an

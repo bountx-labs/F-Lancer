@@ -290,6 +290,33 @@ func (c *Contributor) PullHeadBranch(ctx context.Context, repo string, number in
 	return out.Head.Ref, nil
 }
 
+// PullUpdatedAt returns when a pull request last saw any activity.
+func (c *Contributor) PullUpdatedAt(ctx context.Context, repo string, number int) (time.Time, error) {
+	var out struct {
+		UpdatedAt string `json:"updated_at"`
+	}
+	if err := c.api(ctx, http.MethodGet, fmt.Sprintf("/repos/%s/pulls/%d", repo, number), nil, &out); err != nil {
+		return time.Time{}, err
+	}
+	t, err := time.Parse(time.RFC3339, out.UpdatedAt)
+	if err != nil {
+		return time.Time{}, fmt.Errorf("parse updated_at %q: %w", out.UpdatedAt, err)
+	}
+	return t.UTC(), nil
+}
+
+// ClosePull closes a pull request, leaving a comment first so the closure
+// never looks silent.
+func (c *Contributor) ClosePull(ctx context.Context, repo string, number int, note string) error {
+	if note != "" {
+		if err := c.CommentOnPull(ctx, repo, number, note); err != nil {
+			log.Printf("bounty: close comment on %s#%d failed: %v", repo, number, err)
+		}
+	}
+	path := fmt.Sprintf("/repos/%s/pulls/%d", repo, number)
+	return c.api(ctx, http.MethodPatch, path, map[string]any{"state": "closed"}, nil)
+}
+
 // CommentOnPull posts a comment on a pull request.
 func (c *Contributor) CommentOnPull(ctx context.Context, repo string, number int, body string) error {
 	path := fmt.Sprintf("/repos/%s/issues/%d/comments", repo, number)
