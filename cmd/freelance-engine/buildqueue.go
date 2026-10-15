@@ -85,6 +85,14 @@ func runBuildQueue(cfg *config.Config, pool *llm.Pool, baseDir string, tg *notif
 			continue
 		}
 
+		// A bid carrying a placeholder would be read by the client as an
+		// unfinished template, so it must never reach the queue.
+		if proposal.HasPlaceholder(description) {
+			log.Printf("build-queue: skipping project %d (%s) -- draft still contains a placeholder", project.ID, project.Title)
+			failed++
+			continue
+		}
+
 		existing = append(existing, submitQueueItem{
 			ProjectID:           project.ID,
 			Title:               project.Title,

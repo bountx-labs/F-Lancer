@@ -15,6 +15,26 @@ import (
 
 var placeholderPattern = regexp.MustCompile(`\[(?:NAME|YOUR|INSERT|TODO|PLACEHOLDER|COMPANY|CLIENT|PROJECT|DATE|BUDGET|TIMELINE|EXPERIENCE|SKILL|RATE|LINK)[^\]]*\]`)
 
+// bracketPlaceholderPattern catches a square-bracket token left in a draft,
+// such as [City] or [Portfolio URL].
+var bracketPlaceholderPattern = regexp.MustCompile(`\[[A-Za-z][A-Za-z0-9 _/-]{1,40}\]`)
+
+// HasPlaceholder reports whether a generated draft still contains an
+// unfilled placeholder. Markdown link text such as [here](https://...) is
+// normal prose and is not counted.
+func HasPlaceholder(text string) bool {
+	if placeholderPattern.MatchString(text) {
+		return true
+	}
+	for _, loc := range bracketPlaceholderPattern.FindAllStringIndex(text, -1) {
+		if loc[1] < len(text) && text[loc[1]] == '(' {
+			continue
+		}
+		return true
+	}
+	return false
+}
+
 type Generator struct {
 	pool         *llm.Pool
 	proposalTmpl *template.Template
@@ -76,7 +96,7 @@ func (g *Generator) GenerateProposal(ctx context.Context, job scraper.Job, match
 		return "", fmt.Errorf("generate proposal: %w", err)
 	}
 
-	if placeholderPattern.MatchString(result) {
+	if HasPlaceholder(result) {
 		result, err = g.pool.Complete(ctx, "proposal", "Re-generate this proposal with NO placeholders like [Name] or [Your Experience]. Fill in all values:\n\n"+result)
 		if err != nil {
 			return result, nil
