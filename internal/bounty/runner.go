@@ -35,6 +35,7 @@ type Runner struct {
 	reporter    Reporter
 	scanner     *GitHubScanner
 	contributor *Contributor
+	solver      *Solver
 	cfg         Config
 }
 
@@ -68,6 +69,7 @@ func (r *Runner) SetScanner(s *GitHubScanner) {
 // bounties can be delivered, not just reported.
 func (r *Runner) SetContributor(c *Contributor) {
 	r.contributor = c
+	r.solver = NewSolver(r.evaluator.pool, c)
 }
 
 // Run executes one full cycle and reports what happened. It never returns an
@@ -160,29 +162,50 @@ func (r *Runner) reportGitHubBounties(ctx context.Context) int {
 	}
 	log.Printf("bounty: github scan found %d open bounty issues (best reward hint ~%.0f)", len(issues), best)
 
-	if r.contributor != nil && r.contributor.Authenticated() && len(issues) > 0 {
-		r.claimTopBounty(ctx, issues[0])
+	if r.contributor != nil && r.contributor.Authenticated() {
+		for _, issue := range issues {
+			if r.deliverBounty(ctx, issue) {
+				break
+			}
+		}
 	}
 
 	return len(issues)
 }
 
-// claimTopBounty posts a claim comment on the highest-ranked bounty so the
-// maintainer knows work is starting. Many bounty programs require the claim
-// before a pull request, and the comment is the agent's only way to signal
-// intent. Delivery itself needs a code change, which cannot be produced
-// without reading the repository, so it is left to a dedicated run.
-func (r *Runner) claimTopBounty(ctx context.Context, issue Issue) {
+// deliverBounty claims a bounty and attempts to open a pull request for it.
+// It returns true once a pull request is successfully opened. Claiming without
+// delivering is intentional: most bounty programs require the claim first, and
+// the claim also reserves the work.
+func (r *Runner) deliverBounty(ctx context.Context, issue Issue) bool {
 	repo := issue.RepoFullName()
 	if repo == "" || issue.Number == 0 {
-		return
+		return false
 	}
-	body := "I would like to work on this. I will open a pull request that addresses the acceptance criteria."
-	if err := r.contributor.CommentOnIssue(ctx, repo, issue.Number, body); err != nil {
+
+	claim := "I would like to work on this. I will open a pull request that addresses the acceptance criteria."
+	if err := r.contributor.CommentOnIssue(ctx, repo, issue.Number, claim); err != nil {
 		log.Printf("bounty: claim comment failed for %s#%d: %v", repo, issue.Number, err)
-		return
+		return false
 	}
 	log.Printf("bounty: claimed %s#%d", repo, issue.Number)
+
+	if r.solver == nil {
+		return false
+	}
+	url, err := r.solver.Solve(ctx, issue)
+	if err != nil {
+		log.Printf("bounty: solve %s#%d: %v", repo, issue.Number, err)
+		return false
+	}
+	log.Printf("bounty: opened pull request %s for %s#%d", url, repo, issue.Number)
+
+	if r.reporter != nil {
+		if err := r.reporter.SendAlert("Bounty pull request opened: " + url); err != nil {
+			log.Printf("bounty: telegram alert failed: %v", err)
+		}
+	}
+	return true
 }
 
 // finishAssigned completes every job currently assigned to the agent.

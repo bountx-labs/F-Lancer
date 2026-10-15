@@ -147,40 +147,20 @@ func (c *Contributor) OpenPullRequest(ctx context.Context, upstream, fork, baseB
 		baseBranch = "main"
 	}
 
-	// Resolve the branch's current head on the fork, if the branch exists.
-	headSHA, _ := c.branchSHA(ctx, fork, baseBranch)
+	if _, err := c.branchSHA(ctx, fork, branch); err != nil {
+		if createErr := c.createBranch(ctx, fork, branch, baseBranch); createErr != nil {
+			return "", fmt.Errorf("create branch: %w", createErr)
+		}
+	}
 
 	for _, f := range files {
-		payload := map[string]any{
-			"message": "Apply the change described by the linked issue",
-			"content": base64Encode(f.Content),
+		var existingSHA string
+		if ref, err := c.ReadFile(ctx, fork, f.Path, branch); err == nil {
+			existingSHA = ref.SHA
 		}
-		if headSHA != "" {
-			payload["sha"] = headSHA
+		if _, err := c.WriteFile(ctx, fork, branch, f.Path, f.Content, "Apply the change described by the linked issue", existingSHA); err != nil {
+			return "", fmt.Errorf("write %s: %w", f.Path, err)
 		}
-
-		path := "/repos/" + fork + "/contents/" + f.Path
-		var out struct {
-			Content struct {
-				SHA string `json:"sha"`
-			} `json:"content"`
-			Commit struct {
-				SHA string `json:"sha"`
-			} `json:"commit"`
-		}
-		err := c.api(ctx, http.MethodPut, path+"?ref="+branch, payload, &out)
-		if err != nil && headSHA == "" {
-			// The branch does not exist yet; create it from the base branch.
-			if createErr := c.createBranch(ctx, fork, branch, baseBranch); createErr != nil {
-				return "", fmt.Errorf("create branch: %w", createErr)
-			}
-			if retryErr := c.api(ctx, http.MethodPut, path+"?ref="+branch, payload, &out); retryErr != nil {
-				return "", retryErr
-			}
-		} else if err != nil {
-			return "", err
-		}
-		headSHA = out.Commit.SHA
 	}
 
 	var pr struct {
