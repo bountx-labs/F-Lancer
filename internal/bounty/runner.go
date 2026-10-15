@@ -29,12 +29,13 @@ type Config struct {
 // autonomous pass. It is safe to run repeatedly: already-bid jobs surface as
 // API errors and are skipped rather than failing the whole run.
 type Runner struct {
-	client    *Client
-	evaluator *Evaluator
-	worker    *Worker
-	reporter  Reporter
-	scanner   *GitHubScanner
-	cfg       Config
+	client      *Client
+	evaluator   *Evaluator
+	worker      *Worker
+	reporter    Reporter
+	scanner     *GitHubScanner
+	contributor *Contributor
+	cfg         Config
 }
 
 // NewRunner wires a runner from a pool, client, and reporter.
@@ -61,6 +62,12 @@ func NewRunner(pool *llm.Pool, client *Client, reporter Reporter, cfg Config) *R
 // crypto bounties beyond the MoltJobs marketplace.
 func (r *Runner) SetScanner(s *GitHubScanner) {
 	r.scanner = s
+}
+
+// SetContributor attaches the pull-request contributor so qualified GitHub
+// bounties can be delivered, not just reported.
+func (r *Runner) SetContributor(c *Contributor) {
+	r.contributor = c
 }
 
 // Run executes one full cycle and reports what happened. It never returns an
@@ -145,13 +152,37 @@ func (r *Runner) reportGitHubBounties(ctx context.Context) int {
 
 	best := 0.0
 	for _, issue := range issues {
-		if amt := BountyHint(issue); amt > best {
+		amt := BountyHint(issue)
+		if amt > best {
 			best = amt
 		}
-		log.Printf("bounty: github issue %s (%s) reward~%.0f", issue.HTMLURL, issue.RepoFullName(), BountyHint(issue))
+		log.Printf("bounty: github issue %s (%s) reward~%.0f", issue.HTMLURL, issue.RepoFullName(), amt)
 	}
 	log.Printf("bounty: github scan found %d open bounty issues (best reward hint ~%.0f)", len(issues), best)
+
+	if r.contributor != nil && r.contributor.Authenticated() && len(issues) > 0 {
+		r.claimTopBounty(ctx, issues[0])
+	}
+
 	return len(issues)
+}
+
+// claimTopBounty posts a claim comment on the highest-ranked bounty so the
+// maintainer knows work is starting. Many bounty programs require the claim
+// before a pull request, and the comment is the agent's only way to signal
+// intent. Delivery itself needs a code change, which cannot be produced
+// without reading the repository, so it is left to a dedicated run.
+func (r *Runner) claimTopBounty(ctx context.Context, issue Issue) {
+	repo := issue.RepoFullName()
+	if repo == "" || issue.Number == 0 {
+		return
+	}
+	body := "I would like to work on this. I will open a pull request that addresses the acceptance criteria."
+	if err := r.contributor.CommentOnIssue(ctx, repo, issue.Number, body); err != nil {
+		log.Printf("bounty: claim comment failed for %s#%d: %v", repo, issue.Number, err)
+		return
+	}
+	log.Printf("bounty: claimed %s#%d", repo, issue.Number)
 }
 
 // finishAssigned completes every job currently assigned to the agent.

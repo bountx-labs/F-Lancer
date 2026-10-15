@@ -52,6 +52,7 @@ func runBounty(cfg *config.Config, pool *llm.Pool, baseDir string, tg *notify.Te
 		MaxWorkers: 2,
 	})
 	runner.SetScanner(bounty.NewGitHubScanner(githubToken(), 15*time.Second))
+	runner.SetContributor(bounty.NewContributor(githubPRToken(), 15*time.Second))
 	runner.Run(ctx)
 
 	// Sweep earnings only when a receive address is configured.
@@ -104,6 +105,18 @@ func splitList(v string) []string {
 // the default workflow token is used only as a last resort.
 func githubToken() string {
 	for _, key := range []string{"BOUNTY_GITHUB_TOKEN", "GITHUB_TOKEN"} {
+		if v := strings.TrimSpace(os.Getenv(key)); v != "" {
+			return v
+		}
+	}
+	return ""
+}
+
+// githubPRToken returns the token used to open pull requests and post claims.
+// It needs write access to forks and public repositories, so it is separate
+// from the read-only search token.
+func githubPRToken() string {
+	for _, key := range []string{"PR_GITHUB_TOKEN", "BOUNTY_GITHUB_TOKEN"} {
 		if v := strings.TrimSpace(os.Getenv(key)); v != "" {
 			return v
 		}
