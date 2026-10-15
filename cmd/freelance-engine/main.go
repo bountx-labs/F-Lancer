@@ -89,6 +89,11 @@ func main() {
 		return
 	}
 
+	if cfg.Mode == "bounty-probe" {
+		runBountyProbe(cfg, baseDir, tg)
+		return
+	}
+
 	runMonitor(cfg, pool, skillsReg, baseDir, tg)
 }
 

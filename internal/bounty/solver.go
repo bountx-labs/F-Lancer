@@ -87,6 +87,14 @@ func (s *Solver) Solve(ctx context.Context, issue Issue) (string, error) {
 	return url, nil
 }
 
+// TargetFilesForProbe exposes file extraction for diagnostics, so a probe can
+// confirm an issue parses without opening a pull request.
+func TargetFilesForProbe(issue Issue) []string {
+	s := &Solver{}
+	files, _ := s.targetFiles(issue)
+	return files
+}
+
 // targetFiles extracts the file paths an issue asks to be changed. Bounty
 // issues that spell out a file checklist are the only ones this solver
 // handles, because a change without a named target is not safely automatable.

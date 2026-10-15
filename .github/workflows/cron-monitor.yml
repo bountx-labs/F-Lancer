@@ -17,6 +17,7 @@ on:
           - build-queue
           - submit
           - bounty
+          - bounty-probe
       dry_run:
         description: 'Dry run (no real LLM/Telegram)'
         required: false
