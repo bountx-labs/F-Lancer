@@ -115,6 +115,28 @@ func runBountyProbe(cfg *config.Config, baseDir string, tg *notify.Telegram) {
 	}
 	log.Printf("bounty-probe: read %s (%d bytes)", ref.Path, len(ref.Content))
 
+	// Report the agent's own open pull requests and whether any carry
+	// reviewer feedback that still needs an answer.
+	handler := bounty.NewReviewHandler(nil, contributor)
+	pulls, err := handler.PendingReviews(ctx, login)
+	if err != nil {
+		log.Printf("bounty-probe: list open pull requests failed: %v", err)
+	} else {
+		pending := 0
+		for _, p := range pulls {
+			comments, err := contributor.ReviewComments(ctx, p.Repo, p.Number)
+			if err != nil {
+				log.Printf("bounty-probe: %s#%d comments failed: %v", p.Repo, p.Number, err)
+				continue
+			}
+			if len(comments) > 0 {
+				pending++
+			}
+			log.Printf("bounty-probe: open pull %s#%d (%s) with %d review comments", p.Repo, p.Number, p.Title, len(comments))
+		}
+		log.Printf("bounty-probe: %d open pull requests, %d awaiting a reply", len(pulls), pending)
+	}
+
 	summary := fmt.Sprintf("Bounty probe OK. Identity: %s. Parsed %d target files. Read %s (%d bytes).",
 		login, len(targets), ref.Path, len(ref.Content))
 	tg.SendAlert(summary)
