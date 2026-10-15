@@ -34,18 +34,18 @@ func NewGitHubScanner(token string, timeout time.Duration) *GitHubScanner {
 // The search API returns repository_url rather than an embedded repository
 // object, so the repo is derived from that URL.
 type Issue struct {
-	Number          int      `json:"number"`
-	Title           string   `json:"title"`
-	HTMLURL         string   `json:"html_url"`
-	Body            string   `json:"body"`
-	Labels          []Label  `json:"labels"`
-	RepositoryURL   string   `json:"repository_url"`
-	Repository      RepoRef  `json:"repository"`
-	PullRequest     *pullRef `json:"pull_request,omitempty"`
-	Comments        int      `json:"comments"`
-	CreatedAt       string   `json:"created_at"`
-	State           string   `json:"state"`
-	Assignees       []Person `json:"assignees"`
+	Number        int      `json:"number"`
+	Title         string   `json:"title"`
+	HTMLURL       string   `json:"html_url"`
+	Body          string   `json:"body"`
+	Labels        []Label  `json:"labels"`
+	RepositoryURL string   `json:"repository_url"`
+	Repository    RepoRef  `json:"repository"`
+	PullRequest   *pullRef `json:"pull_request,omitempty"`
+	Comments      int      `json:"comments"`
+	CreatedAt     string   `json:"created_at"`
+	State         string   `json:"state"`
+	Assignees     []Person `json:"assignees"`
 }
 
 // RepoFullName returns the owner/name for the issue, preferring the embedded
