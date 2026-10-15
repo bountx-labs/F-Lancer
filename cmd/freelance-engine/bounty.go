@@ -135,6 +135,15 @@ func runBountyProbe(cfg *config.Config, baseDir string, tg *notify.Telegram) {
 			log.Printf("bounty-probe: open pull %s#%d (%s) with %d review comments", p.Repo, p.Number, p.Title, len(comments))
 		}
 		log.Printf("bounty-probe: %d open pull requests, %d awaiting a reply", len(pulls), pending)
+
+		if orphans, err := handler.FindOrphans(ctx, login); err != nil {
+			log.Printf("bounty-probe: orphan scan failed: %v", err)
+		} else {
+			for _, o := range orphans {
+				log.Printf("bounty-probe: orphan %s#%d idle %d days (comments %d)", o.Repo, o.Number, o.IdleDays, o.Comments)
+			}
+			log.Printf("bounty-probe: %d orphaned pull requests", len(orphans))
+		}
 	}
 
 	summary := fmt.Sprintf("Bounty probe OK. Identity: %s. Parsed %d target files. Read %s (%d bytes).",
