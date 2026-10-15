@@ -8,6 +8,7 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+	"net/url"
 	"strings"
 	"time"
 )
@@ -213,6 +214,100 @@ func (c *Contributor) FetchIssue(ctx context.Context, repo string, number int) (
 	}
 	out.RepositoryURL = "https://api.github.com/repos/" + repo
 	return &out, nil
+}
+
+// ReviewComments returns the review and inline comments on a pull request.
+// Only human and bot review threads are included; the agent's own comments are
+// filtered out so it never answers itself.
+func (c *Contributor) ReviewComments(ctx context.Context, repo string, number int) ([]ReviewComment, error) {
+	var out []ReviewComment
+
+	var reviews []struct {
+		ID   int64  `json:"id"`
+		User struct {
+			Login string `json:"login"`
+		} `json:"user"`
+		Body string `json:"body"`
+	}
+	if err := c.api(ctx, http.MethodGet, fmt.Sprintf("/repos/%s/pulls/%d/reviews", repo, number), nil, &reviews); err == nil {
+		for _, r := range reviews {
+			if strings.TrimSpace(r.Body) == "" {
+				continue
+			}
+			out = append(out, ReviewComment{ID: r.ID, Author: r.User.Login, Body: r.Body})
+		}
+	}
+
+	var inline []struct {
+		ID   int64  `json:"id"`
+		User struct {
+			Login string `json:"login"`
+		} `json:"user"`
+		Body string `json:"body"`
+		Path string `json:"path"`
+		Line int    `json:"line"`
+	}
+	if err := c.api(ctx, http.MethodGet, fmt.Sprintf("/repos/%s/pulls/%d/comments", repo, number), nil, &inline); err == nil {
+		for _, r := range inline {
+			if strings.TrimSpace(r.Body) == "" {
+				continue
+			}
+			out = append(out, ReviewComment{ID: r.ID, Author: r.User.Login, Body: r.Body, Path: r.Path, Line: r.Line})
+		}
+	}
+
+	return out, nil
+}
+
+// PullFiles lists the paths a pull request changes.
+func (c *Contributor) PullFiles(ctx context.Context, repo string, number int) ([]string, error) {
+	var out []struct {
+		Filename string `json:"filename"`
+	}
+	path := fmt.Sprintf("/repos/%s/pulls/%d/files?per_page=30", repo, number)
+	if err := c.api(ctx, http.MethodGet, path, nil, &out); err != nil {
+		return nil, err
+	}
+	files := make([]string, 0, len(out))
+	for _, f := range out {
+		if f.Filename != "" {
+			files = append(files, f.Filename)
+		}
+	}
+	return files, nil
+}
+
+// PullHeadBranch returns the branch name a pull request is opened from.
+func (c *Contributor) PullHeadBranch(ctx context.Context, repo string, number int) (string, error) {
+	var out struct {
+		Head struct {
+			Ref string `json:"ref"`
+		} `json:"head"`
+	}
+	if err := c.api(ctx, http.MethodGet, fmt.Sprintf("/repos/%s/pulls/%d", repo, number), nil, &out); err != nil {
+		return "", err
+	}
+	return out.Head.Ref, nil
+}
+
+// CommentOnPull posts a comment on a pull request.
+func (c *Contributor) CommentOnPull(ctx context.Context, repo string, number int, body string) error {
+	path := fmt.Sprintf("/repos/%s/issues/%d/comments", repo, number)
+	return c.api(ctx, http.MethodPost, path, map[string]any{"body": body}, nil)
+}
+
+// repoFromURL extracts owner/name from a repository API URL.
+func repoFromURL(raw string) string {
+	const marker = "/repos/"
+	if idx := strings.Index(raw, marker); idx >= 0 {
+		return strings.Trim(raw[idx+len(marker):], "/")
+	}
+	return ""
+}
+
+// urlQueryEscape escapes a search query for use in a request path.
+func urlQueryEscape(s string) string {
+	return strings.ReplaceAll(url.QueryEscape(s), "+", "%20")
 }
 
 // CommentOnIssue posts a comment on an issue. Bounty programs often require a

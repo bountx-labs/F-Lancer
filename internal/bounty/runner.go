@@ -36,6 +36,7 @@ type Runner struct {
 	scanner     *GitHubScanner
 	contributor *Contributor
 	solver      *Solver
+	reviews     *ReviewHandler
 	cfg         Config
 }
 
@@ -70,6 +71,39 @@ func (r *Runner) SetScanner(s *GitHubScanner) {
 func (r *Runner) SetContributor(c *Contributor) {
 	r.contributor = c
 	r.solver = NewSolver(r.evaluator.pool, c)
+	r.reviews = NewReviewHandler(r.evaluator.pool, c)
+}
+
+// handleReviews answers reviewer feedback on the agent's own open pull
+// requests. A pull request that is never answered gets closed unmerged, which
+// is exactly how the previous attempts on this account were lost.
+func (r *Runner) handleReviews(ctx context.Context) {
+	if r.reviews == nil {
+		return
+	}
+
+	login, err := r.contributor.CurrentLogin(ctx)
+	if err != nil {
+		log.Printf("bounty: review: identity check failed: %v", err)
+		return
+	}
+
+	pulls, err := r.reviews.PendingReviews(ctx, login)
+	if err != nil {
+		log.Printf("bounty: review: list failed: %v", err)
+		return
+	}
+	if len(pulls) == 0 {
+		return
+	}
+
+	for _, pull := range pulls {
+		if err := r.reviews.Address(ctx, pull); err != nil {
+			log.Printf("bounty: review: %s#%d: %v", pull.Repo, pull.Number, err)
+			continue
+		}
+		log.Printf("bounty: review: addressed feedback on %s#%d", pull.Repo, pull.Number)
+	}
 }
 
 // Run executes one full cycle and reports what happened. It never returns an
@@ -79,6 +113,7 @@ func (r *Runner) Run(ctx context.Context) {
 	defer cancel()
 
 	completed, failed := r.finishAssigned(ctx)
+	r.handleReviews(ctx)
 
 	bidsPlaced, evaluated := 0, 0
 	verticals := r.cfg.Verticals
