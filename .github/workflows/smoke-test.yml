@@ -25,6 +25,10 @@ jobs:
           if [ -n "$unformatted" ]; then
             echo "::error::Files need gofmt:"
             printf '%s\n' "$unformatted"
+            for f in $unformatted; do
+              echo "----- diff for $f -----"
+              gofmt -d "$f"
+            done
             exit 1
           fi
 
