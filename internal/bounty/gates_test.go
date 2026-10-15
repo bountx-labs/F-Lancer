@@ -144,6 +144,31 @@ func TestGatesRejectSeedPhraseRequest(t *testing.T) {
 	}
 }
 
+func TestGatesRejectSelfFundedTask(t *testing.T) {
+	in := baseGateInput()
+	in.Issue.Body = "Post a real task on our platform, funded with at least $10, then write it up. Paid in USDC."
+	v := EvaluateGates(in)
+	if v.Allowed {
+		t.Fatal("a bounty that requires the worker to pay first must be rejected")
+	}
+}
+
+func TestGatesRejectPayToParticipate(t *testing.T) {
+	in := baseGateInput()
+	in.Issue.Body = "Paid in USDC. You must fund the escrow before you can claim."
+	if EvaluateGates(in).Allowed {
+		t.Fatal("expected pay-to-participate to be rejected")
+	}
+}
+
+func TestGatesAcceptNormalPaidWork(t *testing.T) {
+	in := baseGateInput()
+	in.Issue.Body = "Fix the parser bug. Reward paid in USDC on merge. See src/parser.rs for the target."
+	if !EvaluateGates(in).Allowed {
+		t.Fatal("ordinary paid work must still pass")
+	}
+}
+
 func TestGatesCollectAllReasons(t *testing.T) {
 	in := baseGateInput()
 	in.Repo.Stars = 1

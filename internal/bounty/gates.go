@@ -93,6 +93,24 @@ var ScamKeywordPatterns = []string{
 	"first come first served bounty",
 }
 
+// SelfFundingPatterns mark bounties that ask the worker to pay first. These
+// are not paid work: the agent would have to spend money to qualify, which is
+// the opposite of earning. Any match disqualifies the bounty.
+var SelfFundingPatterns = []string{
+	"you must fund",
+	"funded with at least",
+	"post a task",
+	"fund a task",
+	"fund your own",
+	"deposit at least",
+	"stake at least",
+	"pay to claim",
+	"purchase to qualify",
+	"buy to participate",
+	"requires a deposit",
+	"top up to",
+}
+
 // EvaluateGates runs every gate and returns a verdict. It fails closed: any
 // gate that cannot be verified rejects the candidate. A single failing gate is
 // enough to skip the bounty.
@@ -160,6 +178,12 @@ func EvaluateGates(in GateInput) Verdict {
 		reject("scam keyword %q present", kw)
 	}
 
+	// Gate 6b: self-funded task. A bounty that requires the worker to pay
+	// money to qualify is not income; the worker would be the payer.
+	if kw := firstSelfFundingKeyword(text); kw != "" {
+		reject("requires the worker to fund the task (%q); not paid work", kw)
+	}
+
 	// Gate 7: reward plausibility.
 	if amt := BountyHint(in.Issue); amt > MaxPlausibleReward {
 		reject("reward %.0f is implausibly high (max %.0f); typical farming bait", amt, MaxPlausibleReward)
@@ -215,6 +239,16 @@ func hasClaimMarker(lowerText string) bool {
 // firstScamKeyword returns the first scam phrase found, or "".
 func firstScamKeyword(lowerText string) string {
 	for _, kw := range ScamKeywordPatterns {
+		if strings.Contains(lowerText, kw) {
+			return kw
+		}
+	}
+	return ""
+}
+
+// firstSelfFundingKeyword returns the first self-funding phrase found, or "".
+func firstSelfFundingKeyword(lowerText string) string {
+	for _, kw := range SelfFundingPatterns {
 		if strings.Contains(lowerText, kw) {
 			return kw
 		}
