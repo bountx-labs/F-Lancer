@@ -1,0 +1,22 @@
+# Normalize source line endings to LF so formatting checks behave the same on
+# every machine and CI never reports a file as unformatted for line endings.
+* text=auto eol=lf
+
+*.go text eol=lf
+*.yml text eol=lf
+*.yaml text eol=lf
+*.json text eol=lf
+*.md text eol=lf
+*.tmpl text eol=lf
+
+# Windows batch and PowerShell scripts keep CRLF.
+*.bat text eol=crlf
+*.cmd text eol=crlf
+*.ps1 text eol=crlf
+
+# Binary assets must never be touched.
+*.png binary
+*.jpg binary
+*.jpeg binary
+*.gif binary
+*.ico binary
