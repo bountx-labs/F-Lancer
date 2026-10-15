@@ -16,6 +16,8 @@ import (
 	"github.com/bountx-labs/F-Lancer/internal/freelancer"
 	"github.com/bountx-labs/F-Lancer/internal/llm"
 	"github.com/bountx-labs/F-Lancer/internal/notify"
+	"github.com/bountx-labs/F-Lancer/internal/proposal"
+	"github.com/bountx-labs/F-Lancer/internal/scraper"
 )
 
 // runBuildQueue implements MODE=build-queue: it reads the unread briefs in
