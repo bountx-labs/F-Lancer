@@ -20,6 +20,9 @@ type GitHubScanner struct {
 	token   string
 	baseURL string
 	client  *http.Client
+	// pace is the delay inserted between requests. It exists as a field so
+	// tests can set it to zero instead of waiting out the real throttle.
+	pace time.Duration
 }
 
 func NewGitHubScanner(token string, timeout time.Duration) *GitHubScanner {
@@ -27,6 +30,7 @@ func NewGitHubScanner(token string, timeout time.Duration) *GitHubScanner {
 		token:   token,
 		baseURL: "https://api.github.com",
 		client:  &http.Client{Timeout: timeout},
+		pace:    requestGap,
 	}
 }
 
@@ -146,9 +150,11 @@ func (g *GitHubScanner) get(ctx context.Context, url string) ([]byte, error) {
 		}
 
 		// Pace the next request regardless of outcome.
-		select {
-		case <-ctx.Done():
-		case <-time.After(requestGap):
+		if g.pace > 0 {
+			select {
+			case <-ctx.Done():
+			case <-time.After(g.pace):
+			}
 		}
 
 		if resp.StatusCode == http.StatusOK {

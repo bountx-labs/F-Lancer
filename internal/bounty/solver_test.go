@@ -94,8 +94,15 @@ func TestStripCodeFence(t *testing.T) {
 
 func TestStripCodeFenceLeavesPlainContent(t *testing.T) {
 	input := "fn main() {}\n"
-	if got := stripCodeFence(input); got != "fn main() {" {
+	if got := stripCodeFence(input); got != "fn main() {}" {
 		t.Errorf("unexpected: %q", got)
+	}
+}
+
+func TestStripCodeFenceTrimsSurroundingSpace(t *testing.T) {
+	input := "\n\n   fn main() {}   \n\n"
+	if got := stripCodeFence(input); got != "fn main() {}" {
+		t.Errorf("expected trimmed content, got %q", got)
 	}
 }
 
