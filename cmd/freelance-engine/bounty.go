@@ -59,6 +59,66 @@ func runBounty(cfg *config.Config, pool *llm.Pool, baseDir string, tg *notify.Te
 	sweep(ctx, client, agentID, baseDir, tg)
 }
 
+// runBountyProbe verifies the delivery machinery end to end without opening a
+// pull request. It resolves the token identity, checks a real issue can be
+// parsed into file targets, and reads one of those files. Use it to confirm
+// the pipeline works before letting a run act on a live bounty.
+func runBountyProbe(cfg *config.Config, baseDir string, tg *notify.Telegram) {
+	token := githubPRToken()
+	if token == "" {
+		log.Println("bounty-probe: no PR token configured")
+		tg.SendAlert("Bounty probe: no PR token configured.")
+		return
+	}
+
+	ctx := context.Background()
+	contributor := bounty.NewContributor(token, 15*time.Second)
+
+	login, err := contributor.CurrentLogin(ctx)
+	if err != nil {
+		log.Printf("bounty-probe: identity check failed: %v", err)
+		tg.SendAlert("Bounty probe failed at identity: " + err.Error())
+		return
+	}
+	log.Printf("bounty-probe: authenticated as %s", login)
+
+	// Probe against a real issue that lists its target files.
+	const probeRepo = "mxsm/rocketmq-rust"
+	const probeNumber = 11546
+
+	issue := bounty.Issue{
+		Number:        probeNumber,
+		Title:         "probe",
+		RepositoryURL: "https://api.github.com/repos/" + probeRepo,
+	}
+
+	targets := bounty.TargetFilesForProbe(issue)
+	log.Printf("bounty-probe: issue %s#%d lists %d target files", probeRepo, probeNumber, len(targets))
+	if len(targets) == 0 {
+		log.Println("bounty-probe: no target files parsed")
+		tg.SendAlert("Bounty probe: file parsing returned nothing.")
+		return
+	}
+
+	ref, err := contributor.ReadFileAtFork(ctx, probeRepo, "main", targets[0])
+	if err != nil {
+		// Reading from the upstream repo is fine too; the branch may not exist
+		// on this account yet.
+		ref, err = contributor.ReadFile(ctx, probeRepo, targets[0], "")
+	}
+	if err != nil {
+		log.Printf("bounty-probe: read %s failed: %v", targets[0], err)
+		tg.SendAlert("Bounty probe failed reading " + targets[0] + ": " + err.Error())
+		return
+	}
+	log.Printf("bounty-probe: read %s (%d bytes)", ref.Path, len(ref.Content))
+
+	summary := fmt.Sprintf("Bounty probe OK. Identity: %s. Parsed %d target files. Read %s (%d bytes).",
+		login, len(targets), ref.Path, len(ref.Content))
+	tg.SendAlert(summary)
+	log.Println(summary)
+}
+
 // sweep moves accrued USDC to the user's address when WALLET.md defines one.
 // With no address the agent keeps earnings in its own wallet, which is the
 // fully autonomous default.
