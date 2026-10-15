@@ -179,14 +179,13 @@ func truncateBody(b []byte) string {
 }
 
 // PaidBountyLabels mark work that carries a real reward. Only these labels can
-// lead to a payout, so a scan that finds nothing here has found no paying work
-// even if it matched hundreds of general contribution labels.
+// lead to a payout. The list is deliberately short: a live count showed
+// `bounty` alone covers thousands of open issues while `bounty-available`,
+// `algora`, and `opire` return almost nothing, so querying them only burns the
+// search rate limit.
 var PaidBountyLabels = []string{
 	"bounty",
-	"bounty-available",
 	"💎 Bounty",
-	"algora",
-	"opire",
 }
 
 // ContributionLabels are GitHub's standard "please help" labels. They are not

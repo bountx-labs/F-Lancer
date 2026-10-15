@@ -23,9 +23,11 @@ const (
 	// single-issue bounties in the observed market top out well below this.
 	MaxPlausibleReward = 5000.0
 
-	// A repo below this many stars has no track record and no reason to honour
-	// a payout; most legitimate bounty programs run on established repos.
-	MinRepoStars = 50
+	// A repo with no stars at all is almost always a farm or throwaway. Real
+	// projects running funded bounties sit just above that, so the bar is kept
+	// near zero rather than high: a strict threshold rejects genuine work on
+	// small repositories, which is where most real bounties live.
+	MinRepoStars = 5
 
 	// Once this many people have already engaged with an issue, the work is
 	// likely claimed; joining late rarely pays.
@@ -126,7 +128,7 @@ func EvaluateGates(in GateInput) Verdict {
 		reject("repository inactive for %s (max %s)", roundDuration(now.Sub(in.Repo.PushedAt)), MaxRepoInactiveAge)
 	}
 	if in.Repo.Stars < MinRepoStars {
-		reject("repository has only %d stars (min %d); no track record to honour a payout", in.Repo.Stars, MinRepoStars)
+		reject("repository has only %d stars (min %d); too new or throwaway to hold a funded bounty", in.Repo.Stars, MinRepoStars)
 	}
 
 	// Gate 3: payment rail. Unknown tokens are not money.

@@ -74,9 +74,17 @@ func TestGatesRejectUnknownPushDate(t *testing.T) {
 
 func TestGatesRejectLowStars(t *testing.T) {
 	in := baseGateInput()
-	in.Repo.Stars = 3
+	in.Repo.Stars = 2
 	if EvaluateGates(in).Allowed {
-		t.Fatal("expected low-star repo to be rejected")
+		t.Fatal("expected a near-zero-star repo to be rejected")
+	}
+}
+
+func TestGatesAcceptSmallRealRepo(t *testing.T) {
+	in := baseGateInput()
+	in.Repo.Stars = 4
+	if !EvaluateGates(in).Allowed {
+		t.Fatal("a small but real repository should pass; most funded bounties live on small repos")
 	}
 }
 
