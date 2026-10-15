@@ -23,6 +23,8 @@ type GitHubScanner struct {
 	// pace is the delay inserted between requests. It exists as a field so
 	// tests can set it to zero instead of waiting out the real throttle.
 	pace time.Duration
+	// attempts overrides the retry count; zero means use the default.
+	attempts int
 }
 
 func NewGitHubScanner(token string, timeout time.Duration) *GitHubScanner {
@@ -114,11 +116,20 @@ const requestGap = 2500 * time.Millisecond
 // retry waits longer, so a few attempts cover a short throttling window.
 const maxRetries = 4
 
+// retries returns how many attempts a request gets. Tests set attempts to one
+// so a rejected request fails fast instead of waiting out the real backoff.
+func (g *GitHubScanner) retries() int {
+	if g.attempts > 0 {
+		return g.attempts
+	}
+	return maxRetries
+}
+
 // get performs a GET with retry/backoff on rate-limit responses and paces
 // every attempt so the scanner never bursts the API.
 func (g *GitHubScanner) get(ctx context.Context, url string) ([]byte, error) {
 	var lastErr error
-	for attempt := 0; attempt < maxRetries; attempt++ {
+	for attempt := 0; attempt < g.retries(); attempt++ {
 		if attempt > 0 {
 			select {
 			case <-ctx.Done():

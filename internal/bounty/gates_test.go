@@ -74,7 +74,7 @@ func TestGatesRejectUnknownPushDate(t *testing.T) {
 
 func TestGatesRejectLowStars(t *testing.T) {
 	in := baseGateInput()
-	in.Repo.Stars = 2
+	in.Repo.Stars = 4
 	if EvaluateGates(in).Allowed {
 		t.Fatal("expected a near-zero-star repo to be rejected")
 	}
@@ -82,9 +82,17 @@ func TestGatesRejectLowStars(t *testing.T) {
 
 func TestGatesAcceptSmallRealRepo(t *testing.T) {
 	in := baseGateInput()
-	in.Repo.Stars = 4
+	in.Repo.Stars = MinRepoStars
 	if !EvaluateGates(in).Allowed {
 		t.Fatal("a small but real repository should pass; most funded bounties live on small repos")
+	}
+}
+
+func TestMinRepoStarsIsLowEnoughForRealWork(t *testing.T) {
+	// A high bar rejects genuine bounties: a live count showed only 13 of
+	// 3,829 open bounty issues sit on repositories with more than 50 stars.
+	if MinRepoStars > 10 {
+		t.Errorf("star bar of %d would filter out most real bounties", MinRepoStars)
 	}
 }
 
