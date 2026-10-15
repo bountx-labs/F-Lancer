@@ -233,36 +233,27 @@ func suggestBid(maxBudget float64) float64 {
 }
 
 // queueGenerator renders the proposal template and calls the LLM for one job.
+// It reuses the shared proposal generator so bid copy follows the same
+// placeholder handling as every other path.
 type queueGenerator struct {
-	pool *llm.Pool
-	gen  *queueTemplate
-}
-
-type queueTemplate struct {
-	tmpl string
+	gen *proposal.Generator
 }
 
 func newQueueGenerator(pool *llm.Pool, promptsDir string) (*queueGenerator, error) {
-	data, err := os.ReadFile(filepath.Join(promptsDir, "proposal.tmpl"))
+	gen, err := proposal.New(pool, promptsDir)
 	if err != nil {
 		return nil, err
 	}
-	return &queueGenerator{pool: pool, gen: &queueTemplate{tmpl: string(data)}}, nil
+	return &queueGenerator{gen: gen}, nil
 }
 
-// Generate produces the bid description for a project using the same proposal
-// template the monitor path uses, keeping bid copy consistent everywhere.
+// Generate produces the bid description for a project.
 func (g *queueGenerator) Generate(ctx context.Context, project freelancer.Project, bidAmount float64) (string, error) {
-	prompt := strings.NewReplacer(
-		"{{.Title}}", project.Title,
-		"{{.Description}}", project.Title,
-		"{{.Budget}}", strconv.FormatFloat(bidAmount, 'f', 2, 64),
-		"{{.Category}}", "",
-	).Replace(g.gen.tmpl)
-
-	result, err := g.pool.Complete(ctx, "proposal", prompt)
-	if err != nil {
-		return "", err
+	job := scraper.Job{
+		Title:       project.Title,
+		Description: project.Description,
+		Budget:      strconv.FormatFloat(bidAmount, 'f', 2, 64),
+		Category:    project.Category,
 	}
-	return strings.TrimSpace(result), nil
+	return g.gen.GenerateProposal(ctx, job, nil)
 }
