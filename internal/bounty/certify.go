@@ -160,7 +160,7 @@ func (c *Certifier) answer(q *EvalQuestion) string {
 		if upper[i] < 'A' || upper[i] > 'E' {
 			continue
 		}
-		idx := int(upper[i]-'A')
+		idx := int(upper[i] - 'A')
 		if idx < len(q.Options) {
 			return string(upper[i])
 		}
