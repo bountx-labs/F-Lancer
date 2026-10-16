@@ -110,10 +110,11 @@ func runBounty(cfg *config.Config, pool *llm.Pool, baseDir string, tg *notify.Te
 	}
 
 	runner := bounty.NewRunner(pool, client, tg, bounty.Config{
-		AgentID:    agentID,
-		Verticals:  verticals,
-		MaxBids:    maxBids,
-		MaxWorkers: 2,
+		AgentID:       agentID,
+		Verticals:     verticals,
+		MaxBids:       maxBids,
+		MaxWorkers:    2,
+		PayoutAddress: receiveAddress(baseDir),
 	})
 	scanner := bounty.NewGitHubScanner(githubToken(), 15*time.Second)
 	if store, err := bounty.NewSeenStore(filepath.Join(baseDir, "state", "bounty_seen.json")); err != nil {
@@ -227,11 +228,18 @@ func runBountyProbe(cfg *config.Config, baseDir string, tg *notify.Telegram) {
 	log.Println(summary)
 }
 
+// receiveAddress reads the public receive address from WALLET.md. It returns
+// "" when none is configured, which disables both sweeping and printing the
+// address in a claim.
+func receiveAddress(baseDir string) string {
+	return bounty.ReadReceiveAddress(bounty.ReadWalletFile(baseDir))
+}
+
 // sweep moves accrued USDC to the user's address when WALLET.md defines one.
 // With no address the agent keeps earnings in its own wallet, which is the
 // fully autonomous default.
 func sweep(ctx context.Context, client *bounty.Client, agentID, baseDir string, tg *notify.Telegram) {
-	address := bounty.ReadReceiveAddress(bounty.ReadWalletFile(baseDir))
+	address := receiveAddress(baseDir)
 	if address == "" {
 		log.Println("bounty: no receive address configured, earnings stay in agent wallet")
 		return

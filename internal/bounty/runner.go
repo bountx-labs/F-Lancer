@@ -23,6 +23,10 @@ type Config struct {
 	MaxBids    int
 	MaxWorkers int
 	Timeout    time.Duration
+	// PayoutAddress is the public wallet printed in a claim comment so a
+	// maintainer has somewhere to send the reward. Empty leaves the claim
+	// without an address, which is the case until the owner supplies one.
+	PayoutAddress string
 }
 
 // Runner discovers, qualifies, bids on, and completes MoltJobs work in one
@@ -245,7 +249,7 @@ func (r *Runner) deliverBounty(ctx context.Context, issue Issue) bool {
 		return false
 	}
 
-	claim := "I would like to work on this. I will open a pull request that addresses the acceptance criteria."
+	claim := claimComment(r.cfg.PayoutAddress)
 	if err := r.contributor.CommentOnIssue(ctx, repo, issue.Number, claim); err != nil {
 		log.Printf("bounty: claim comment failed for %s#%d: %v", repo, issue.Number, err)
 		return false
@@ -265,6 +269,18 @@ func (r *Runner) deliverBounty(ctx context.Context, issue Issue) bool {
 		}
 	}
 	return true
+}
+
+// claimComment builds the public claim for an issue. When a payout address is
+// configured it is included, so the maintainer has a destination for the
+// reward without a follow-up question. With no address the claim still reserves
+// the work, and the address can be added once it is configured.
+func claimComment(payoutAddress string) string {
+	const base = "I would like to work on this. I will open a pull request that addresses the acceptance criteria."
+	if strings.TrimSpace(payoutAddress) == "" {
+		return base
+	}
+	return base + "\n\nPayout address: `" + strings.TrimSpace(payoutAddress) + "`"
 }
 
 // finishAssigned completes every job currently assigned to the agent.
