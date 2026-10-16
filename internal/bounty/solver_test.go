@@ -113,8 +113,65 @@ func TestBuildRevisePromptMarksUntrusted(t *testing.T) {
 	if !strings.Contains(p, "BEGIN UNTRUSTED ISSUE") || !strings.Contains(p, "END UNTRUSTED FILE CONTENT") {
 		t.Error("prompt must delimit untrusted content")
 	}
-	if !strings.Contains(p, "Return only the new file content") {
-		t.Error("prompt must constrain the output")
+	if !strings.Contains(p, `"edits"`) {
+		t.Error("prompt must ask for an edit list")
+	}
+	if !strings.Contains(p, "Never reformat") {
+		t.Error("prompt must forbid rewriting unrelated code")
+	}
+}
+
+func TestParseEdits(t *testing.T) {
+	got, err := parseEdits("```json\n{\"edits\":[{\"find\":\"a\",\"replace\":\"b\"}]}\n```")
+	if err != nil {
+		t.Fatalf("parse: %v", err)
+	}
+	if len(got) != 1 || got[0].Find != "a" || got[0].Replace != "b" {
+		t.Errorf("unexpected edits: %+v", got)
+	}
+}
+
+func TestParseEditsRejectsGarbage(t *testing.T) {
+	if _, err := parseEdits("no json here"); err == nil {
+		t.Error("expected an error for a reply with no edit object")
+	}
+	if _, err := parseEdits(`{"edits":[]}`); err == nil {
+		t.Error("expected an error for an empty edit list")
+	}
+}
+
+func TestApplyEdits(t *testing.T) {
+	original := "alpha\nbeta\ngamma\n"
+	got, err := applyEdits(original, []Edit{{Find: "beta", Replace: "BETA"}})
+	if err != nil {
+		t.Fatalf("apply: %v", err)
+	}
+	if got != "alpha\nBETA\ngamma\n" {
+		t.Errorf("unexpected result: %q", got)
+	}
+}
+
+func TestApplyEditsFailsClosed(t *testing.T) {
+	original := "alpha\nalpha\n"
+	if _, err := applyEdits(original, []Edit{{Find: "alpha", Replace: "x"}}); err == nil {
+		t.Error("an ambiguous find must be an error, not a guess")
+	}
+	if _, err := applyEdits(original, []Edit{{Find: "missing", Replace: "x"}}); err == nil {
+		t.Error("a missing find must be an error")
+	}
+	if _, err := applyEdits(original, []Edit{{Find: "alpha", Replace: "alpha"}}); err == nil {
+		t.Error("an edit that changes nothing must be an error")
+	}
+}
+
+func TestApplyEditsPreservesUnrelatedBytes(t *testing.T) {
+	original := "// important documentation\nfn main() {\n    old();\n}\n"
+	got, err := applyEdits(original, []Edit{{Find: "    old();", Replace: "    new();"}})
+	if err != nil {
+		t.Fatalf("apply: %v", err)
+	}
+	if !strings.Contains(got, "// important documentation") {
+		t.Errorf("unrelated comment was lost: %q", got)
 	}
 }
 
@@ -126,25 +183,5 @@ func TestBuildPRBodyReferencesIssue(t *testing.T) {
 	}
 	if !strings.Contains(body, "src/a.rs") {
 		t.Errorf("PR body must list the changed file: %q", body)
-	}
-}
-
-func TestRevisionDropsTooMuch(t *testing.T) {
-	big := strings.Repeat("line\n", 200)
-	tests := []struct {
-		name     string
-		original string
-		revised  string
-		want     bool
-	}{
-		{"small file exempt", "fn a() {}\n", "fn b() {}\n", false},
-		{"keeps most of a large file", big, strings.Repeat("line\n", 190), false},
-		{"half kept", big, strings.Repeat("line\n", 100), false},
-		{"gutted large file", big, strings.Repeat("line\n", 40), true},
-	}
-	for _, tc := range tests {
-		if got := revisionDropsTooMuch(tc.original, tc.revised); got != tc.want {
-			t.Errorf("%s: revisionDropsTooMuch = %v, want %v", tc.name, got, tc.want)
-		}
 	}
 }
