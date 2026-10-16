@@ -103,6 +103,7 @@ jobs:
           # Stage each path separately: one missing path would otherwise abort
           # git add and skip the rest (e.g. state/ is absent in setup mode).
           git add state/seen_jobs.json 2>/dev/null || true
+          git add state/bounty_seen.json 2>/dev/null || true
           git add proposals/inbox/ 2>/dev/null || true
           git add proposals/drafts/ 2>/dev/null || true
           git add profiles/ 2>/dev/null || true
