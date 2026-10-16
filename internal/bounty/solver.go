@@ -22,6 +22,30 @@ func NewSolver(pool *llm.Pool, contributor *Contributor) *Solver {
 	return &Solver{pool: pool, contributor: contributor}
 }
 
+// Solvable reports whether the solver can attempt this issue at all: it names
+// at least one file that exists in the target repository. The runner uses this
+// to avoid claiming work it cannot deliver, because a claim comment on an issue
+// nobody can act on is noise for the maintainer.
+func (s *Solver) Solvable(ctx context.Context, issue Issue) bool {
+	if s.contributor == nil || !s.contributor.Authenticated() {
+		return false
+	}
+	repo := issue.RepoFullName()
+	if repo == "" {
+		return false
+	}
+	files, err := s.targetFiles(issue)
+	if err != nil || len(files) == 0 {
+		return false
+	}
+	for _, path := range files {
+		if _, err := s.contributor.ReadFile(ctx, repo, path, ""); err == nil {
+			return true
+		}
+	}
+	return false
+}
+
 // Solve attempts to deliver a bounty. It returns the pull request URL on
 // success and an error describing exactly why it stopped otherwise. Every
 // failure is a clean stop, never a partial push.
@@ -181,7 +205,9 @@ type Edit struct {
 }
 
 // parseEdits reads the model's edit list out of its reply, tolerating prose or
-// a code fence around the JSON object.
+// a code fence around the JSON object. Models routinely emit a literal newline
+// or tab inside a JSON string instead of the escaped form, which strict JSON
+// rejects, so a repair pass escapes those characters before the second attempt.
 func parseEdits(s string) ([]Edit, error) {
 	t := stripCodeFence(s)
 	start := strings.Index(t, "{")
@@ -189,16 +215,54 @@ func parseEdits(s string) ([]Edit, error) {
 	if start < 0 || end <= start {
 		return nil, fmt.Errorf("model returned no edit object")
 	}
+	raw := t[start : end+1]
+
 	var payload struct {
 		Edits []Edit `json:"edits"`
 	}
-	if err := json.Unmarshal([]byte(t[start:end+1]), &payload); err != nil {
-		return nil, fmt.Errorf("decode edits: %w", err)
+	if err := json.Unmarshal([]byte(raw), &payload); err != nil {
+		if err2 := json.Unmarshal([]byte(escapeControlChars(raw)), &payload); err2 != nil {
+			return nil, fmt.Errorf("decode edits: %w", err)
+		}
 	}
 	if len(payload.Edits) == 0 {
 		return nil, fmt.Errorf("model returned no edits")
 	}
 	return payload.Edits, nil
+}
+
+// escapeControlChars rewrites raw control characters that appear inside JSON
+// string literals into their escaped forms. Quotes, braces, and any character
+// outside a string are left alone so the structure is not disturbed.
+func escapeControlChars(s string) string {
+	var b strings.Builder
+	b.Grow(len(s))
+	inString := false
+	escaped := false
+	for _, r := range s {
+		if escaped {
+			b.WriteRune(r)
+			escaped = false
+			continue
+		}
+		switch {
+		case r == '\\' && inString:
+			b.WriteRune(r)
+			escaped = true
+		case r == '"':
+			inString = !inString
+			b.WriteRune(r)
+		case inString && r == '\n':
+			b.WriteString(`\n`)
+		case inString && r == '\r':
+			b.WriteString(`\r`)
+		case inString && r == '\t':
+			b.WriteString(`\t`)
+		default:
+			b.WriteRune(r)
+		}
+	}
+	return b.String()
 }
 
 // applyEdits applies each edit to the original content. It fails closed: an

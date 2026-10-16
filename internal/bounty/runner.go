@@ -232,6 +232,19 @@ func (r *Runner) deliverBounty(ctx context.Context, issue Issue) bool {
 		return false
 	}
 
+	if r.solver == nil {
+		return false
+	}
+
+	// Check that the work can actually be delivered before claiming it. An
+	// issue whose named files do not exist in the target repository cannot be
+	// solved here, and claiming it would only add a public comment nobody can
+	// act on and burn a run.
+	if !r.solver.Solvable(ctx, issue) {
+		log.Printf("bounty: skip %s#%d -- no target file from the issue exists in the repository", repo, issue.Number)
+		return false
+	}
+
 	claim := "I would like to work on this. I will open a pull request that addresses the acceptance criteria."
 	if err := r.contributor.CommentOnIssue(ctx, repo, issue.Number, claim); err != nil {
 		log.Printf("bounty: claim comment failed for %s#%d: %v", repo, issue.Number, err)
@@ -239,9 +252,6 @@ func (r *Runner) deliverBounty(ctx context.Context, issue Issue) bool {
 	}
 	log.Printf("bounty: claimed %s#%d", repo, issue.Number)
 
-	if r.solver == nil {
-		return false
-	}
 	url, err := r.solver.Solve(ctx, issue)
 	if err != nil {
 		log.Printf("bounty: solve %s#%d: %v", repo, issue.Number, err)

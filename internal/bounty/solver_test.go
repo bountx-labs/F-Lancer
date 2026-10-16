@@ -131,6 +131,31 @@ func TestParseEdits(t *testing.T) {
 	}
 }
 
+// Models routinely put a literal newline inside a JSON string, which strict
+// decoding rejects. The reply must still be usable.
+func TestParseEditsRepairsLiteralNewlines(t *testing.T) {
+	raw := "{\"edits\":[{\"find\":\"line one\nline two\",\"replace\":\"merged line\"}]}"
+	got, err := parseEdits(raw)
+	if err != nil {
+		t.Fatalf("parse: %v", err)
+	}
+	if len(got) != 1 || got[0].Find != "line one\nline two" {
+		t.Errorf("unexpected edits: %+v", got)
+	}
+}
+
+func TestEscapeControlChars(t *testing.T) {
+	in := `{"find":"a	b","replace":"c\nd"}`
+	out := escapeControlChars(in)
+	if !strings.Contains(out, `\t`) || !strings.Contains(out, `\n`) {
+		t.Errorf("control characters must be escaped: %q", out)
+	}
+	// A real newline that separates structure must survive as structure.
+	if !strings.Contains(escapeControlChars("a\nb"), "\n") {
+		t.Error("a newline outside a string must not be escaped")
+	}
+}
+
 func TestParseEditsRejectsGarbage(t *testing.T) {
 	if _, err := parseEdits("no json here"); err == nil {
 		t.Error("expected an error for a reply with no edit object")
