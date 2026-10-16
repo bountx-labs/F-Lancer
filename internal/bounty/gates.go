@@ -155,11 +155,14 @@ func EvaluateGates(in GateInput) Verdict {
 		reject("no recognised payout method mentioned (need one of: %s)", strings.Join(KnownGoodRails[:6], ", "))
 	}
 
-	// Gate 3b: a paid label must be present. GitHub's "good first issue" and
-	// "help wanted" labels mean "please contribute"; they carry no reward, so
-	// work matched only through them cannot pay anything.
-	if !HasPaidLabel(in.Issue.Labels) {
-		reject("no paid bounty label present; matched only contribution labels")
+	// Gate 3b: a paid-work marker must be present. GitHub's "good first issue"
+	// and "help wanted" labels mean "please contribute"; they carry no reward,
+	// so work matched only through them cannot pay anything. The marker is not
+	// required to be a label: a funded program can publish findings as plain
+	// issues with an explicit severity and reward and no label at all, and a
+	// label-only check silently discarded every one of them.
+	if !HasPaidSignal(in.Issue) {
+		reject("no paid-work marker found in labels, title, or body")
 	}
 
 	// Gate 4: competition. Work already engaged by others is likely taken.
@@ -205,6 +208,48 @@ func HasPaidLabel(labels []Label) bool {
 		}
 		// Labels that embed an amount, e.g. "$250" or "bounty: $500".
 		if strings.Contains(name, "bounty") || strings.Contains(name, "$") {
+			return true
+		}
+	}
+	return false
+}
+
+// PaidTextSignals are phrases in an issue title or body that mark it as funded
+// work even when no label says so. Funded programs frequently publish findings
+// with a stated severity and reward and no label at all, so a label-only check
+// discards their entire pipeline. The list holds words that denote a bounty
+// program specifically: a bare mention of a payment rail is not one, because
+// "we accept USDC" says nothing about whether this issue pays.
+var PaidTextSignals = []string{
+	"bounty",
+	"reward",
+	"severity:",
+	"severity :",
+	"bug bounty",
+	"payout",
+	"finders fee",
+	"finder's fee",
+}
+
+// maxTitleBodyScan bounds how much of an issue body is inspected for a paid
+// marker. Reward terms appear near the top, so a large body costs time only.
+const maxTitleBodyScan = 4000
+
+// HasPaidSignal reports whether an issue carries any marker of funded work,
+// checking labels, then the title, then the start of the body. It widens
+// HasPaidLabel without dropping the label path, so both labelled and unlabelled
+// paid work are recognised.
+func HasPaidSignal(issue Issue) bool {
+	if HasPaidLabel(issue.Labels) {
+		return true
+	}
+	body := issue.Body
+	if len(body) > maxTitleBodyScan {
+		body = body[:maxTitleBodyScan]
+	}
+	text := strings.ToLower(issue.Title + " " + body)
+	for _, sig := range PaidTextSignals {
+		if strings.Contains(text, sig) {
 			return true
 		}
 	}

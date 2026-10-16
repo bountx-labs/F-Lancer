@@ -245,3 +245,34 @@ func TestGatesAcceptAmountInLabel(t *testing.T) {
 		t.Fatal("a label carrying an amount should count as paid")
 	}
 }
+
+func TestHasPaidSignal(t *testing.T) {
+	tests := []struct {
+		name  string
+		issue Issue
+		want  bool
+	}{
+		{"labelled", Issue{Labels: []Label{{Name: "bounty"}}}, true},
+		{"amount label", Issue{Labels: []Label{{Name: "$250"}}}, true},
+		{"title severity", Issue{Title: "[BOUNTY] Medium: proof truncation"}, true},
+		{"body severity", Issue{Title: "Fix parser", Body: "**Severity**: Medium ($150 USDC)"}, true},
+		{"body reward", Issue{Title: "Fix parser", Body: "Rewards are paid on triage."}, true},
+		{"plain contribution", Issue{Labels: []Label{{Name: "good first issue"}}, Body: "Contribution welcome. Paid in USDC."}, false},
+		{"bare rail", Issue{Title: "Docs update", Body: "We accept USDC donations."}, false},
+		{"empty", Issue{}, false},
+	}
+	for _, tc := range tests {
+		if got := HasPaidSignal(tc.issue); got != tc.want {
+			t.Errorf("%s: HasPaidSignal = %v, want %v", tc.name, got, tc.want)
+		}
+	}
+}
+
+func TestGatesAcceptUnlabelledFundedIssue(t *testing.T) {
+	in := baseGateInput()
+	in.Issue.Labels = nil
+	in.Issue.Title = "[BOUNTY] Medium: unrecorded pending spend"
+	if !EvaluateGates(in).Allowed {
+		t.Fatal("an unlabelled issue with an explicit bounty marker is paid work")
+	}
+}

@@ -218,16 +218,28 @@ var ContributionLabels = []string{
 // DefaultBountyLabels is what the scanner searches. It is the paid set only.
 var DefaultBountyLabels = PaidBountyLabels
 
+// DiscoveryQueries are free-text searches that surface funded work which
+// carries no bounty label. A live count showed the labelled market is almost
+// entirely stale: the newest open `label:bounty` issue was months old, while
+// current, genuinely open work sat in unlabelled funded programs that only
+// appear through their wording. These queries close that gap.
+var DiscoveryQueries = []string{
+	`"USDC" bounty`,
+	`"bounty" "severity"`,
+}
+
 // searchPageSize is how many issues one label query fetches. GitHub caps this
 // at 100. It is far larger than the number of bounties acted on, because the
 // pages are ordered newest first and a small page would stop before reaching
 // genuinely fresh work.
 const searchPageSize = 100
 
-// ScanBounties returns open issues matching any bounty label, newest first,
-// de-duplicated by issue URL. It skips pull requests, already-assigned work,
-// and anything already evaluated, then runs every hard gate so only credible,
-// freshly posted work is returned.
+// ScanBounties returns open issues that carry funded work, newest first,
+// de-duplicated by issue URL. It searches both bounty labels and free-text
+// paid markers, because a live scan found the labelled market almost entirely
+// stale while current funded work sat in unlabelled programs. Pull requests,
+// already-assigned work, and anything already evaluated are skipped, then every
+// hard gate runs so only credible, freshly posted work is returned.
 //
 // The freshness ordering matters more than the filtering: funded bounties are
 // claimed within hours, so the newest issue is the only one with a real chance
@@ -252,7 +264,7 @@ func (g *GitHubScanner) ScanBounties(ctx context.Context, labels []string, limit
 		// result limit meant a fresh bounty sitting past the twentieth
 		// result was never even fetched, which is how a genuinely live bounty
 		// was missed while the agent saw nothing but stale leftovers.
-		issues, err := g.searchLabel(ctx, label, searchPageSize)
+		issues, err := g.searchIssues(ctx, fmt.Sprintf(`label:"%s"`, label), searchPageSize)
 		if err != nil {
 			searchFailed++
 			log.Printf("bounty: search label %q failed (likely rate limit): %v", label, err)
@@ -273,6 +285,41 @@ func (g *GitHubScanner) ScanBounties(ctx context.Context, labels []string, limit
 
 			// Skip anything already evaluated on an earlier cycle so a fast
 			// poll does not spend its budget re-reading known issues.
+			if g.seenStore != nil {
+				key := IssueKey(issue.RepoFullName(), issue.Number)
+				if g.seenStore.Has(key) {
+					alreadySeen++
+					continue
+				}
+			}
+
+			candidates = append(candidates, issue)
+		}
+	}
+
+	// Text discovery runs after the label sweep so unlabelled funded work is
+	// considered even when no label query returns anything current. The same
+	// de-duplication and seen-store filtering apply.
+	for _, qualifier := range DiscoveryQueries {
+		issues, err := g.searchIssues(ctx, qualifier, searchPageSize)
+		if err != nil {
+			searchFailed++
+			log.Printf("bounty: search %q failed (likely rate limit): %v", qualifier, err)
+			continue
+		}
+		searched += len(issues)
+		for _, issue := range issues {
+			if issue.PullRequest != nil {
+				continue
+			}
+			if len(issue.Assignees) > 0 {
+				continue
+			}
+			if seen[issue.HTMLURL] {
+				continue
+			}
+			seen[issue.HTMLURL] = true
+
 			if g.seenStore != nil {
 				key := IssueKey(issue.RepoFullName(), issue.Number)
 				if g.seenStore.Has(key) {
@@ -379,9 +426,11 @@ func (g *GitHubScanner) repoMeta(ctx context.Context, fullName string, cache map
 	return meta, nil
 }
 
-// searchLabel queries the search API for open, unassigned issues with a label.
-func (g *GitHubScanner) searchLabel(ctx context.Context, label string, perPage int) ([]Issue, error) {
-	q := fmt.Sprintf(`label:"%s" state:open is:issue no:assignee`, label)
+// searchIssues queries the search API for open, unassigned issues matching the
+// given qualifiers. The caller supplies the full filter, so both label and
+// free-text discovery share one implementation.
+func (g *GitHubScanner) searchIssues(ctx context.Context, qualifier string, perPage int) ([]Issue, error) {
+	q := fmt.Sprintf(`%s state:open is:issue no:assignee`, qualifier)
 	params := url.Values{}
 	params.Set("q", q)
 	params.Set("sort", "created")

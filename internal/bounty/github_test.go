@@ -259,3 +259,48 @@ func TestScanBountiesSurvivesErrorStatus(t *testing.T) {
 		t.Errorf("expected no issues, got %d", len(issues))
 	}
 }
+
+// The live market put current funded work in unlabelled programs while every
+// label query returned only stale leftovers, so text discovery must be able to
+// surface an issue that no label query returns.
+func TestScanBountiesIncludesTextDiscovery(t *testing.T) {
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if strings.HasPrefix(r.URL.Path, "/repos/") {
+			json.NewEncoder(w).Encode(map[string]any{
+				"full_name":        "funded/program",
+				"stargazers_count": 50,
+				"pushed_at":        time.Now().UTC().Add(-24 * time.Hour).Format(time.RFC3339),
+			})
+			return
+		}
+		if strings.Contains(r.URL.Query().Get("q"), "label:") {
+			json.NewEncoder(w).Encode(map[string]any{"items": []map[string]any{}})
+			return
+		}
+		issue := map[string]any{
+			"number":         7,
+			"title":          "[BOUNTY] Medium: truncated leaf index",
+			"html_url":       "https://github.com/funded/program/issues/7",
+			"body":           "Severity: Medium ($150 USDC). Payout addresses below.",
+			"created_at":     time.Now().UTC().Add(-1 * time.Hour).Format(time.RFC3339),
+			"comments":       0,
+			"repository_url": "https://api.github.com/repos/funded/program",
+		}
+		json.NewEncoder(w).Encode(map[string]any{"items": []map[string]any{issue}})
+	}))
+	defer srv.Close()
+
+	s := NewGitHubScanner("", 5*time.Second)
+	s.baseURL = srv.URL
+	s.client = srv.Client()
+	s.pace = 0
+	s.attempts = 1
+
+	issues, err := s.ScanBounties(context.Background(), []string{"bounty"}, 10)
+	if err != nil {
+		t.Fatalf("scan: %v", err)
+	}
+	if len(issues) != 1 || issues[0].Number != 7 {
+		t.Fatalf("text discovery should surface the unlabelled funded issue, got %+v", issues)
+	}
+}
