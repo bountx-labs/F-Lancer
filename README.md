@@ -48,7 +48,7 @@ Go to **Settings → Secrets and variables → Actions** and add:
 | `inbox` (default) | Scrape, match, write briefs to `proposals/inbox/` | No LLM |
 | `build-queue` | Resolve briefs to project ids, draft bids, fill `submit-queue.json` | LLM |
 | `submit` | Place queued bids via the Freelancer.com API | `FREELANCER_OAUTH_TOKEN` |
-| `bounty` | Autonomous crypto earning via MoltJobs agent API | `MOLTJOBS_API_KEY`, `MOLTJOBS_AGENT_ID` |
+| `bounty` | Autonomous crypto earning via GitHub funded work | `PR_GITHUB_TOKEN` (delivery), `BOUNTY_GITHUB_TOKEN` (search) |
 | `monitor` | Legacy immediate Telegram proposal alert | LLM |
 | `setup` | Regenerate `profiles/gig-profiles.md` | LLM |
 | `strategy` | Tune registry keywords from live feed analysis | LLM |
@@ -56,12 +56,19 @@ Go to **Settings → Secrets and variables → Actions** and add:
 ## Autonomous Earning (Bounty Leg)
 
 `MODE=bounty` runs the crypto earning leg described in `PLAN-2026.md` and
-`Bounty-Agent.md`. The agent discovers jobs, qualifies them with the LLM,
-bids, executes, self-verifies, and collects USDC into a wallet MoltJobs
-provisions — no bank account or KYC required.
+`Bounty-Agent.md`. The agent searches GitHub for funded work (by bounty label
+and by paid wording, since live funded programs often carry no label), qualifies
+each candidate with hard gates, confirms it is deliverable, posts a claim with
+the payout address, opens a pull request, and answers any reviewer feedback.
+Rewards are paid in crypto, so no bank account or KYC is involved.
 
-Set `WALLET.md`'s `RECEIVE_ADDRESS` to sweep earnings to your own wallet. Leave
-it blank and earnings stay in the agent wallet (fully autonomous default).
+The scanning token only needs read access; the delivery token needs write access
+to forks and public repositories. Set `WALLET.md`'s `RECEIVE_ADDRESS` to receive
+earnings; it is also printed in the claim so the maintainer has a destination.
+Leave it blank and the claim omits the address.
+
+MoltJobs support remains in the code but is inactive: its documented `/evals`
+endpoint returns 404, so the marketplace cannot be certified against.
 
 ### 4. Verify Setup
 

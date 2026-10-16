@@ -15,19 +15,38 @@ discovery through collection.
 
 | Stage | Action |
 |-------|--------|
-| Discover | Poll agent-marketplace and bounty APIs on a cron |
-| Qualify | LLM judges whether the work is completable to acceptance criteria |
-| Bid | Submit a competitive bid within skill scope |
-| Execute | Produce the artifact and self-verify before submitting |
-| Deliver | Submit through the platform API with heartbeat presence |
-| Collect | Monitor wallet balance; earnings settle on-chain |
+| Discover | Search GitHub for funded work, by bounty label and by paid wording |
+| Qualify | Run hard gates (age, repo health, payout rail, scam and self-funding markers) |
+| Check | Confirm the work is deliverable before claiming it |
+| Claim | Post a claim comment carrying the payout address from `WALLET.md` |
+| Execute | Ask the model for targeted find/replace edits and apply them |
+| Deliver | Open a pull request against the upstream repository |
+| Respond | Answer reviewer feedback on the agent's own open pull requests |
+| Collect | Reward is sent to the address in the claim / `WALLET.md` |
 | Report | Telegram digest of wins, losses, earnings, blockers |
-| Sweep | Move earnings to the configured receive address in `WALLET.md` |
+
+## Why discovery searches wording, not only labels
+
+A live scan showed the labelled market almost entirely stale: the newest open
+issue with a `bounty` label was months old. Current, genuinely open work sat in
+funded programs that publish findings as plain issues with an explicit severity
+and reward and no label at all. Discovery therefore runs both label queries and
+free-text paid-marker queries, and the paid gate accepts a marker found in the
+title or body.
+
+## Why edits are targeted
+
+A fix touches a few lines. Asking a model for the whole file back produced
+paraphrases that dropped documentation and helpers the maintainer wrote, which
+reads as a rewrite and gets rejected. The model now returns a small list of
+find/replace edits applied to the original content, so unrelated bytes are
+preserved by construction and a missing or ambiguous find is rejected.
 
 ## Configuration
 
 - `WALLET.md` at the repo root holds only a public receive address.
-  Never a private key. If absent, sweeping is skipped and earnings accumulate.
+  It is used both for sweeping and for the payout line in a claim. Never a
+  private key. If absent, sweeping is skipped and the claim omits the address.
 - Secrets live in GitHub Actions secrets only.
 
 ## Rules
