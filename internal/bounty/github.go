@@ -35,6 +35,27 @@ func (g *GitHubScanner) SetSeenStore(s *SeenStore) {
 	g.seenStore = s
 }
 
+// MarkHandled records an issue as handled so a later run does not select it
+// again. The scanner chooses candidates before delivery runs, so without this
+// a second run could post the same public claim comment on an issue the first
+// run had already claimed.
+func (g *GitHubScanner) MarkHandled(repo string, number int) {
+	if g.seenStore == nil {
+		return
+	}
+	g.seenStore.Mark(IssueKey(repo, number))
+}
+
+// DeferRetry pushes an issue out of the next few scans without retiring it.
+// Used when an attempt failed for a transient reason: the issue deserves
+// another try, but not on the very next cycle.
+func (g *GitHubScanner) DeferRetry(repo string, number int, d time.Duration) {
+	if g.seenStore == nil {
+		return
+	}
+	g.seenStore.SkipFor(IssueKey(repo, number), d)
+}
+
 func NewGitHubScanner(token string, timeout time.Duration) *GitHubScanner {
 	return &GitHubScanner{
 		token:   token,
@@ -94,12 +115,18 @@ type RepoRef struct {
 // RepoMeta is the repository detail the gates need. The search API returns an
 // abbreviated repo object, so the scanner fetches the full record per repo and
 // caches it to stay within the unauthenticated rate limit.
+//
+// MainPushedAt is when the default branch itself last moved. PushedAt is the
+// newest push to any branch, so a repository drowning in unmerged bot branches
+// still looks busy; MainPushedAt is the signal that says whether the maintainer
+// is actually landing work.
 type RepoMeta struct {
-	FullName string
-	Stars    int
-	PushedAt time.Time
-	Archived bool
-	Fork     bool
+	FullName     string
+	Stars        int
+	PushedAt     time.Time
+	MainPushedAt time.Time
+	Archived     bool
+	Fork         bool
 }
 
 type Label struct {
@@ -293,7 +320,7 @@ func (g *GitHubScanner) ScanBounties(ctx context.Context, labels []string, limit
 			// poll does not spend its budget re-reading known issues.
 			if g.seenStore != nil {
 				key := IssueKey(issue.RepoFullName(), issue.Number)
-				if g.seenStore.Has(key) {
+				if g.seenStore.ShouldSkip(key) {
 					alreadySeen++
 					continue
 				}
@@ -328,7 +355,7 @@ func (g *GitHubScanner) ScanBounties(ctx context.Context, labels []string, limit
 
 			if g.seenStore != nil {
 				key := IssueKey(issue.RepoFullName(), issue.Number)
-				if g.seenStore.Has(key) {
+				if g.seenStore.ShouldSkip(key) {
 					alreadySeen++
 					continue
 				}
@@ -410,11 +437,12 @@ func (g *GitHubScanner) repoMeta(ctx context.Context, fullName string, cache map
 	}
 
 	var raw struct {
-		FullName string `json:"full_name"`
-		Stars    int    `json:"stargazers_count"`
-		PushedAt string `json:"pushed_at"`
-		Archived bool   `json:"archived"`
-		Fork     bool   `json:"fork"`
+		FullName      string `json:"full_name"`
+		Stars         int    `json:"stargazers_count"`
+		PushedAt      string `json:"pushed_at"`
+		Archived      bool   `json:"archived"`
+		Fork          bool   `json:"fork"`
+		DefaultBranch string `json:"default_branch"`
 	}
 	if err := json.Unmarshal(body, &raw); err != nil {
 		return RepoMeta{}, err
@@ -422,14 +450,48 @@ func (g *GitHubScanner) repoMeta(ctx context.Context, fullName string, cache map
 
 	pushed, _ := time.Parse(time.RFC3339, raw.PushedAt)
 	meta := RepoMeta{
-		FullName: raw.FullName,
-		Stars:    raw.Stars,
-		PushedAt: pushed,
-		Archived: raw.Archived,
-		Fork:     raw.Fork,
+		FullName:     raw.FullName,
+		Stars:        raw.Stars,
+		PushedAt:     pushed,
+		MainPushedAt: g.mainBranchPushedAt(ctx, fullName, raw.DefaultBranch),
+		Archived:     raw.Archived,
+		Fork:         raw.Fork,
 	}
 	cache[fullName] = meta
 	return meta, nil
+}
+
+// mainBranchPushedAt returns the commit date of the newest commit on the
+// repository's default branch. A repo can look freshly pushed while nothing has
+// landed on the default branch for weeks, and only the latter says whether the
+// maintainer still reviews and merges. A failed lookup returns the zero time,
+// which the activity gate treats as unverifiable, so the candidate is skipped
+// rather than assumed good.
+func (g *GitHubScanner) mainBranchPushedAt(ctx context.Context, fullName, branch string) time.Time {
+	if branch == "" {
+		branch = "main"
+	}
+	endpoint := fmt.Sprintf("%s/repos/%s/commits?sha=%s&per_page=1", g.baseURL, fullName, url.QueryEscape(branch))
+	body, err := g.get(ctx, endpoint)
+	if err != nil {
+		return time.Time{}
+	}
+
+	var commits []struct {
+		Commit struct {
+			Committer struct {
+				Date string `json:"date"`
+			} `json:"committer"`
+		} `json:"commit"`
+	}
+	if err := json.Unmarshal(body, &commits); err != nil || len(commits) == 0 {
+		return time.Time{}
+	}
+	t, err := time.Parse(time.RFC3339, commits[0].Commit.Committer.Date)
+	if err != nil {
+		return time.Time{}
+	}
+	return t
 }
 
 // searchIssues queries the search API for open, unassigned issues matching the

@@ -71,6 +71,15 @@ func TestFirstLinesKeepsShort(t *testing.T) {
 	}
 }
 
+// mainCommitsJSON is the shape the commits endpoint returns. The activity gate
+// reads the newest commit on the default branch, so every scanner mock has to
+// serve it alongside the repo detail.
+func mainCommitsJSON(t time.Time) []map[string]any {
+	return []map[string]any{
+		{"commit": map[string]any{"committer": map[string]any{"date": t.Format(time.RFC3339)}}},
+	}
+}
+
 // newScannerForTest serves both the search endpoint and the repo detail
 // endpoint so the gates can run. Issues returned are given a healthy age.
 func newScannerForTest(t *testing.T, status int, body string) (*GitHubScanner, *httptest.Server) {
@@ -79,6 +88,10 @@ func newScannerForTest(t *testing.T, status int, body string) (*GitHubScanner, *
 		if r.Header.Get("Accept") != "application/vnd.github+json" {
 			t.Errorf("missing github accept header")
 		}
+		if strings.HasSuffix(r.URL.Path, "/commits") {
+			json.NewEncoder(w).Encode(mainCommitsJSON(time.Now().UTC().Add(-24 * time.Hour)))
+			return
+		}
 		if strings.HasPrefix(r.URL.Path, "/repos/") {
 			json.NewEncoder(w).Encode(map[string]any{
 				"full_name":        "good/repo",
@@ -86,6 +99,7 @@ func newScannerForTest(t *testing.T, status int, body string) (*GitHubScanner, *
 				"pushed_at":        time.Now().UTC().Add(-24 * time.Hour).Format(time.RFC3339),
 				"archived":         false,
 				"fork":             false,
+				"default_branch":   "main",
 			})
 			return
 		}
@@ -168,11 +182,16 @@ func TestScanBountiesDeduplicates(t *testing.T) {
 
 func TestScanBountiesRejectsLowStarRepo(t *testing.T) {
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if strings.HasSuffix(r.URL.Path, "/commits") {
+			json.NewEncoder(w).Encode(mainCommitsJSON(time.Now().UTC().Add(-1 * time.Hour)))
+			return
+		}
 		if strings.HasPrefix(r.URL.Path, "/repos/") {
 			json.NewEncoder(w).Encode(map[string]any{
 				"full_name":        "tiny/repo",
 				"stargazers_count": 2,
 				"pushed_at":        time.Now().UTC().Add(-1 * time.Hour).Format(time.RFC3339),
+				"default_branch":   "main",
 			})
 			return
 		}
@@ -265,11 +284,16 @@ func TestScanBountiesSurvivesErrorStatus(t *testing.T) {
 // surface an issue that no label query returns.
 func TestScanBountiesIncludesTextDiscovery(t *testing.T) {
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if strings.HasSuffix(r.URL.Path, "/commits") {
+			json.NewEncoder(w).Encode(mainCommitsJSON(time.Now().UTC().Add(-24 * time.Hour)))
+			return
+		}
 		if strings.HasPrefix(r.URL.Path, "/repos/") {
 			json.NewEncoder(w).Encode(map[string]any{
 				"full_name":        "funded/program",
 				"stargazers_count": 50,
 				"pushed_at":        time.Now().UTC().Add(-24 * time.Hour).Format(time.RFC3339),
+				"default_branch":   "main",
 			})
 			return
 		}

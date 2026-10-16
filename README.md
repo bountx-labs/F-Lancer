@@ -70,6 +70,18 @@ Leave it blank and the claim omits the address.
 MoltJobs support remains in the code but is inactive: its documented `/evals`
 endpoint returns 404, so the marketplace cannot be certified against.
 
+Two lessons from live runs are now enforced in the gates, because the first
+version of this leg spent real work on a program that could never pay:
+
+- A published bounty policy is not evidence of a live program. The activity
+  gate reads the newest commit on the target's **default branch**, not its
+  `pushed_at`. A repository whose default branch has not moved in weeks is not
+  triaging, however busy its branch list looks, and a pull request there cannot
+  be merged or paid.
+- A claim comment is permanent, so it is never posted twice. An issue is
+  recorded as handled the moment its claim lands, which stops a failed solve
+  from causing the same public claim to be posted again on the next cycle.
+
 ### 4. Verify Setup
 
 Run the smoke test workflow:

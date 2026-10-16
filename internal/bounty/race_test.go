@@ -84,6 +84,38 @@ func TestSeenStorePruneDropsOldEntries(t *testing.T) {
 	}
 }
 
+func TestSeenStoreSkipForDefersRetry(t *testing.T) {
+	s, _ := NewSeenStore(filepath.Join(t.TempDir(), "seen.json"))
+	key := IssueKey("o/r", 11)
+	if s.ShouldSkip(key) {
+		t.Fatal("an unseen key should not be skipped")
+	}
+
+	s.SkipFor(key, time.Hour)
+	if !s.ShouldSkip(key) {
+		t.Fatal("a key in its cooldown window should be skipped")
+	}
+
+	// An expired cooldown must let the issue be reconsidered.
+	s.SkipUntil[key] = time.Now().UTC().Add(-time.Minute)
+	if s.ShouldSkip(key) {
+		t.Fatal("an expired cooldown should not keep skipping the issue")
+	}
+}
+
+// The same issue was claimed twice in eight minutes: the scanner selected it,
+// delivery failed after the public claim comment was already posted, and the
+// next run selected it again because a selected issue was never recorded. A
+// claimed issue has to be marked at selection time.
+func TestSeenStoreMarkedIssueIsNotReselected(t *testing.T) {
+	s, _ := NewSeenStore(filepath.Join(t.TempDir(), "seen.json"))
+	key := IssueKey("o/r", 12)
+	s.Mark(key)
+	if !s.ShouldSkip(key) {
+		t.Fatal("an issue already handled must not be selected again")
+	}
+}
+
 func TestIssueKey(t *testing.T) {
 	if got := IssueKey("o/r", 42); got != "o/r#42" {
 		t.Errorf("unexpected key: %q", got)

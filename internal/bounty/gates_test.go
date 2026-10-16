@@ -16,9 +16,10 @@ func baseGateInput() GateInput {
 			Labels:    []Label{{Name: "bounty"}},
 		},
 		Repo: RepoMeta{
-			FullName: "good/repo",
-			Stars:    500,
-			PushedAt: time.Now().UTC().Add(-24 * time.Hour),
+			FullName:     "good/repo",
+			Stars:        500,
+			PushedAt:     time.Now().UTC().Add(-24 * time.Hour),
+			MainPushedAt: time.Now().UTC().Add(-24 * time.Hour),
 		},
 		Now: time.Now().UTC(),
 	}
@@ -61,6 +62,37 @@ func TestGatesRejectInactiveRepo(t *testing.T) {
 	in.Repo.PushedAt = in.Now.Add(-365 * 24 * time.Hour)
 	if EvaluateGates(in).Allowed {
 		t.Fatal("expected inactive repo to be rejected")
+	}
+}
+
+// A repository can look busy while nothing lands on the default branch: the
+// paraloom-labs bounty program had a healthy PushedAt and a live bounty
+// document, but its default branch had not moved since 2026-09-29 while
+// hundreds of finding pull requests piled up unmerged and unanswered. PushedAt
+// alone let every one of them through.
+func TestGatesRejectStaleDefaultBranch(t *testing.T) {
+	in := baseGateInput()
+	in.Repo.PushedAt = in.Now.Add(-1 * time.Hour)
+	in.Repo.MainPushedAt = in.Now.Add(-30 * 24 * time.Hour)
+	v := EvaluateGates(in)
+	if v.Allowed {
+		t.Fatal("expected a repository whose default branch is stale to be rejected")
+	}
+}
+
+func TestGatesRejectUnknownDefaultBranchDate(t *testing.T) {
+	in := baseGateInput()
+	in.Repo.MainPushedAt = time.Time{}
+	if EvaluateGates(in).Allowed {
+		t.Fatal("expected rejection when the default branch date cannot be read")
+	}
+}
+
+func TestGatesAcceptRecentlyLandedWork(t *testing.T) {
+	in := baseGateInput()
+	in.Repo.MainPushedAt = in.Now.Add(-MaxMainStaleAge + time.Hour)
+	if !EvaluateGates(in).Allowed {
+		t.Fatal("a repository landing work within the window should pass")
 	}
 }
 

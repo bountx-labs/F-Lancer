@@ -82,6 +82,29 @@ func (s *SeenStore) Mark(key string) {
 	s.Seen[key] = time.Now().UTC()
 }
 
+// SkipFor defers an issue without retiring it. An issue that could not be
+// attempted yet, but may become attemptable, should be reconsidered later
+// rather than dropped for good or re-examined on every cycle.
+func (s *SeenStore) SkipFor(key string, d time.Duration) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	s.SkipUntil[key] = time.Now().UTC().Add(d)
+}
+
+// ShouldSkip reports whether the issue is already handled or is still in its
+// retry cooldown.
+func (s *SeenStore) ShouldSkip(key string) bool {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	if _, ok := s.Seen[key]; ok {
+		return true
+	}
+	if t, ok := s.SkipUntil[key]; ok && time.Now().UTC().Before(t) {
+		return true
+	}
+	return false
+}
+
 // Prune drops entries older than the retention period so the file stays small.
 func (s *SeenStore) Prune(retention time.Duration) int {
 	s.mu.Lock()

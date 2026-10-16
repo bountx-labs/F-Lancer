@@ -19,6 +19,15 @@ const (
 	// abandoned, so a merged PR would never be reviewed or paid.
 	MaxRepoInactiveAge = 180 * 24 * time.Hour
 
+	// MaxMainStaleAge is how long the default branch may go without a commit
+	// before the project is treated as not triaging. PushedAt cannot detect
+	// this: anyone can push a branch, so a repository with a thousand open
+	// bot pull requests still looks active. What matters is whether work is
+	// actually landing on the default branch. A project that has merged
+	// nothing for this long while funded findings pile up is not a market,
+	// and every pull request opened against it is wasted.
+	MaxMainStaleAge = 14 * 24 * time.Hour
+
 	// Bounties far above this are almost always fake reward farming. Genuine
 	// single-issue bounties in the observed market top out well below this.
 	MaxPlausibleReward = 5000.0
@@ -147,6 +156,20 @@ func EvaluateGates(in GateInput) Verdict {
 	}
 	if in.Repo.Stars < MinRepoStars {
 		reject("repository has only %d stars (min %d); too new or throwaway to hold a funded bounty", in.Repo.Stars, MinRepoStars)
+	}
+
+	// Gate 2b: is the maintainer still merging? PushedAt cannot answer this,
+	// because a branch push refreshes it: a repository where hundreds of bot
+	// pull requests pile up unmerged still reports activity. What decides
+	// whether work here can ever pay is whether the default branch moved.
+	// This gate exists because a funded program with a healthy PushedAt, a
+	// live bounty document, and a thousand open findings had merged nothing
+	// and answered nobody, and the scanner kept opening pull requests into it.
+	if in.Repo.MainPushedAt.IsZero() {
+		reject("cannot determine when the default branch last changed")
+	} else if stale := now.Sub(in.Repo.MainPushedAt); stale > MaxMainStaleAge {
+		reject("default branch unchanged for %s (max %s); the project is not landing work, so a pull request here cannot be merged or paid",
+			roundDuration(stale), MaxMainStaleAge)
 	}
 
 	// Gate 3: payment rail. Unknown tokens are not money.

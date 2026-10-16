@@ -34,6 +34,31 @@ and reward and no label at all. Discovery therefore runs both label queries and
 free-text paid-marker queries, and the paid gate accepts a marker found in the
 title or body.
 
+## Why a live bounty document is not enough
+
+Discovery reached a funded program that looked ideal on paper: a public
+$3,000 USDC pool, severity tiers, an in-repo bounty policy that named paid
+external reporters, and fresh unlabelled findings posted daily. Pull requests
+were opened into it. The program was dead on arrival.
+
+The evidence was in plain sight and the old gates could not see it. Its default
+branch had not moved since a date weeks earlier. Its merge rate over the three
+preceding months had fallen from dozens to three, then to zero. The maintainer
+had not acknowledged a single one of the roughly thirty findings posted that
+month. What looked like a market was a backlog: a program whose policy was
+still published while nobody was triaging.
+
+Two gates now cover this:
+
+- **Main-branch activity.** A repository's `pushed_at` is refreshed by any
+  branch push, so a repo drowning in unmerged finding branches still reports
+  itself as active. The gate reads the newest commit on the default branch
+  instead, because that is what decides whether work lands and gets paid.
+- **Selection-time dedupe.** An issue is recorded as handled the moment its
+  public claim comment is posted, not after delivery succeeds. Before this, a
+  failed solve left the issue unrecorded and the next cycle claimed the same
+  issue again, posting the identical public comment twice.
+
 ## Why edits are targeted
 
 A fix touches a few lines. Asking a model for the whole file back produced

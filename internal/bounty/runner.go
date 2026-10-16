@@ -29,6 +29,12 @@ type Config struct {
 	PayoutAddress string
 }
 
+// retryCooldown is how long an issue that could not be attempted is left alone
+// before the scanner looks at it again. It is long enough that an unsuitable
+// issue does not consume every cycle's budget, and short enough that a target
+// file appearing in a later commit is picked up the same day.
+const retryCooldown = 6 * time.Hour
+
 // Runner discovers, qualifies, bids on, and completes MoltJobs work in one
 // autonomous pass. It is safe to run repeatedly: already-bid jobs surface as
 // API errors and are skipped rather than failing the whole run.
@@ -246,6 +252,12 @@ func (r *Runner) deliverBounty(ctx context.Context, issue Issue) bool {
 	// act on and burn a run.
 	if !r.solver.Solvable(ctx, issue) {
 		log.Printf("bounty: skip %s#%d -- no target file from the issue exists in the repository", repo, issue.Number)
+		// Do not retire it: the referenced files can appear in a later commit,
+		// so the issue is deferred rather than permanently dropped, and the
+		// deferral keeps the next scan from repeating the same lookups.
+		if r.scanner != nil {
+			r.scanner.DeferRetry(repo, issue.Number, retryCooldown)
+		}
 		return false
 	}
 
@@ -255,6 +267,15 @@ func (r *Runner) deliverBounty(ctx context.Context, issue Issue) bool {
 		return false
 	}
 	log.Printf("bounty: claimed %s#%d", repo, issue.Number)
+
+	// The claim comment is public and permanent, so it must never be posted
+	// twice. Recording the issue as handled the moment the claim lands, rather
+	// than after a successful solve, means a later run cannot claim the same
+	// issue again. A failed solve previously left the issue unrecorded, and the
+	// next cycle posted the identical comment on the same issue.
+	if r.scanner != nil {
+		r.scanner.MarkHandled(repo, issue.Number)
+	}
 
 	url, err := r.solver.Solve(ctx, issue)
 	if err != nil {
