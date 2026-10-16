@@ -120,6 +120,12 @@ type searchResponse struct {
 // the scanner paces itself between every request.
 const requestGap = 2500 * time.Millisecond
 
+// maxResponseBytes bounds how much of a GitHub response is read. A search page
+// of 100 results carries each issue's full body, which easily exceeds a
+// megabyte; truncating at that size cut the JSON off mid-object and the decode
+// failed, losing the whole page. The limit is high enough for a full page.
+const maxResponseBytes = 8 << 20
+
 // maxRetries bounds how many times a rate-limited request is retried. Each
 // retry waits longer, so a few attempts cover a short throttling window.
 const maxRetries = 4
@@ -161,7 +167,7 @@ func (g *GitHubScanner) get(ctx context.Context, url string) ([]byte, error) {
 			continue
 		}
 
-		body, readErr := io.ReadAll(io.LimitReader(resp.Body, 1<<20))
+		body, readErr := io.ReadAll(io.LimitReader(resp.Body, maxResponseBytes))
 		resp.Body.Close()
 		if readErr != nil {
 			lastErr = readErr
