@@ -235,6 +235,10 @@ var PaidTextSignals = []string{
 // marker. Reward terms appear near the top, so a large body costs time only.
 const maxTitleBodyScan = 4000
 
+// markdownStripper removes the emphasis and code characters that issue authors
+// use around a marker. "**Severity**:" would otherwise not match "severity:".
+var markdownStripper = strings.NewReplacer("*", "", "_", "", "`", "", "#", "")
+
 // HasPaidSignal reports whether an issue carries any marker of funded work,
 // checking labels, then the title, then the start of the body. It widens
 // HasPaidLabel without dropping the label path, so both labelled and unlabelled
@@ -247,7 +251,7 @@ func HasPaidSignal(issue Issue) bool {
 	if len(body) > maxTitleBodyScan {
 		body = body[:maxTitleBodyScan]
 	}
-	text := strings.ToLower(issue.Title + " " + body)
+	text := markdownStripper.Replace(strings.ToLower(issue.Title + " " + body))
 	for _, sig := range PaidTextSignals {
 		if strings.Contains(text, sig) {
 			return true
