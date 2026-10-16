@@ -70,6 +70,10 @@ func (s *Solver) Solve(ctx context.Context, issue Issue) (string, error) {
 		if revised == "" || revised == ref.Content {
 			continue
 		}
+		if revisionDropsTooMuch(ref.Content, revised) {
+			log.Printf("bounty: revise %s dropped too much of the file; skipping to avoid losing unrelated code", path)
+			continue
+		}
 		changes = append(changes, FileChange{Path: path, Content: revised})
 	}
 
@@ -154,6 +158,24 @@ func looksLikeRepoPath(s string) bool {
 		return false
 	}
 	return true
+}
+
+// minRetainedLines bounds how much of an original file a revision may drop.
+// A targeted bounty fix touches a handful of lines; a revision that deletes
+// most of a large file is the model paraphrasing the whole thing rather than
+// fixing it, which silently discards unrelated code and comments the
+// maintainer wrote. Such a change is worse than no change, so it is dropped.
+const minRetainedLines = 0.5
+
+// revisionDropsTooMuch reports whether a revision removed so much of the
+// original that it is a rewrite rather than a fix. Small files are exempt:
+// a fix on a short file can legitimately replace most of it.
+func revisionDropsTooMuch(original, revised string) bool {
+	origLines := strings.Count(original, "\n")
+	if origLines < 20 {
+		return false
+	}
+	return strings.Count(revised, "\n") < int(float64(origLines)*minRetainedLines)
 }
 
 // revise asks the model for the full revised content of one file.

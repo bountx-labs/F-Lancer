@@ -128,3 +128,23 @@ func TestBuildPRBodyReferencesIssue(t *testing.T) {
 		t.Errorf("PR body must list the changed file: %q", body)
 	}
 }
+
+func TestRevisionDropsTooMuch(t *testing.T) {
+	big := strings.Repeat("line\n", 200)
+	tests := []struct {
+		name     string
+		original string
+		revised  string
+		want     bool
+	}{
+		{"small file exempt", "fn a() {}\n", "fn b() {}\n", false},
+		{"keeps most of a large file", big, strings.Repeat("line\n", 190), false},
+		{"half kept", big, strings.Repeat("line\n", 100), false},
+		{"gutted large file", big, strings.Repeat("line\n", 40), true},
+	}
+	for _, tc := range tests {
+		if got := revisionDropsTooMuch(tc.original, tc.revised); got != tc.want {
+			t.Errorf("%s: revisionDropsTooMuch = %v, want %v", tc.name, got, tc.want)
+		}
+	}
+}
