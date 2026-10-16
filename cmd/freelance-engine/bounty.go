@@ -16,6 +16,41 @@ import (
 	"github.com/bountx-labs/F-Lancer/internal/notify"
 )
 
+// runCertify completes the MoltJobs certification packs. The general pack is
+// required before any bid is accepted, so it runs first. A pack that fails is
+// reported honestly rather than retried in a loop.
+func runCertify(cfg *config.Config, pool *llm.Pool, baseDir string, tg *notify.Telegram) {
+	apiKey := os.Getenv("MOLTJOBS_API_KEY")
+	if apiKey == "" {
+		log.Println("certify: MOLTJOBS_API_KEY missing")
+		tg.SendAlert("Certify mode: MOLTJOBS_API_KEY missing.")
+		return
+	}
+
+	client := bounty.NewClient(apiKey, time.Duration(cfg.LLMTimeoutSeconds)*time.Second)
+	certifier := bounty.NewCertifier(client, pool)
+	ctx := context.Background()
+
+	var lines []string
+	for _, pack := range []string{bounty.EvalGeneral, bounty.EvalEngineering, bounty.EvalProduct} {
+		result, err := certifier.Certify(ctx, pack)
+		if err != nil {
+			log.Printf("certify: %s failed: %v", pack, err)
+			lines = append(lines, fmt.Sprintf("%s: error %v", pack, err))
+			continue
+		}
+		status := "FAILED"
+		if result.Passed {
+			status = "PASSED"
+		}
+		lines = append(lines, fmt.Sprintf("%s: %.0f%% %s", pack, result.Score, status))
+	}
+
+	summary := "Certification results -- " + strings.Join(lines, " | ")
+	log.Println(summary)
+	tg.SendAlert(summary)
+}
+
 // runBounty implements MODE=bounty: the autonomous crypto earning leg. It
 // registers nothing and needs no user action beyond an optional receive
 // address; MoltJobs provisions the agent wallet itself.
@@ -29,6 +64,21 @@ func runBounty(cfg *config.Config, pool *llm.Pool, baseDir string, tg *notify.Te
 
 	client := bounty.NewClient(apiKey, time.Duration(cfg.LLMTimeoutSeconds)*time.Second)
 	ctx := context.Background()
+
+	// Certification is the hard gate on the marketplace. Without a passing
+	// general pack every bid is refused, so it runs before any bidding and
+	// only while certification is still missing.
+	if strings.EqualFold(os.Getenv("BOUNTY_CERTIFY"), "true") {
+		certifier := bounty.NewCertifier(client, pool)
+		for _, pack := range []string{bounty.EvalGeneral, bounty.EvalEngineering, bounty.EvalProduct} {
+			result, err := certifier.Certify(ctx, pack)
+			if err != nil {
+				log.Printf("bounty: certification %s failed: %v", pack, err)
+				continue
+			}
+			log.Printf("bounty: certification %s scored %.0f%%, passed=%v", pack, result.Score, result.Passed)
+		}
+	}
 
 	// Resolve the agent id from the API key so setup only needs one secret.
 	// An explicit MOLTJOBS_AGENT_ID still wins when provided.

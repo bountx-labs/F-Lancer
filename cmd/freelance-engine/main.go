@@ -94,6 +94,11 @@ func main() {
 		return
 	}
 
+	if cfg.Mode == "certify" {
+		runCertify(cfg, pool, baseDir, tg)
+		return
+	}
+
 	runMonitor(cfg, pool, skillsReg, baseDir, tg)
 }
 

@@ -23,6 +23,7 @@ on:
           - submit
           - bounty
           - bounty-probe
+          - certify
       dry_run:
         description: 'Dry run (no real LLM/Telegram)'
         required: false
@@ -74,6 +75,7 @@ jobs:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           BOUNTY_GITHUB_TOKEN: ${{ secrets.BOUNTY_GITHUB_TOKEN }}
           PR_GITHUB_TOKEN: ${{ secrets.PR_GITHUB_TOKEN }}
+          BOUNTY_CERTIFY: ${{ vars.BOUNTY_CERTIFY }}
           SCHEDULE_MODE: ${{ github.event.schedule }}
           INPUT_MODE: ${{ inputs.mode }}
           DRY_RUN: ${{ inputs.dry_run || 'false' }}
