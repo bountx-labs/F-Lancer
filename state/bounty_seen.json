@@ -2,6 +2,7 @@
   "seen": {
     "Ac0rdP/AccordProtocol#838": "2026-10-16T10:57:35.197252255Z",
     "AstralDeep/AstralDeep#322": "2026-10-16T21:05:33.38787599Z",
+    "AstralDeep/AstralDeep#323": "2026-10-17T01:30:47.11906721Z",
     "AstralDeep/AstralDeep#324": "2026-10-16T21:05:33.387872089Z",
     "AstralDeep/AstralDeep#325": "2026-10-16T18:10:33.44406299Z",
     "AstralDeep/AstralDeep#326": "2026-10-16T18:10:33.444068179Z",
@@ -16,9 +17,16 @@
     "AstralDeep/AstralDeep#348": "2026-10-16T10:11:02.378339005Z",
     "AstralDeep/AstralDeep#349": "2026-10-16T10:11:02.37833575Z",
     "BasedHardware/omi#21678": "2026-10-16T10:11:02.377861025Z",
+    "BasedHardware/omi#21848": "2026-10-17T01:30:47.119065676Z",
+    "BasedHardware/omi#21852": "2026-10-17T01:30:47.119064123Z",
+    "BasedHardware/omi#21863": "2026-10-17T01:30:47.119062011Z",
+    "BasedHardware/omi#21867": "2026-10-17T01:30:47.119059517Z",
+    "BasedHardware/omi#21892": "2026-10-17T01:30:47.119056873Z",
+    "BasedHardware/omi#21895": "2026-10-17T01:30:47.119054732Z",
     "BasedHardware/omi#21899": "2026-10-16T23:31:53.65694713Z",
     "BasedHardware/omi#21901": "2026-10-16T23:31:53.656943163Z",
     "BasedHardware/omi#21907": "2026-10-16T23:31:53.656934977Z",
+    "BasedHardware/omi#21911": "2026-10-17T01:30:47.119050329Z",
     "BasedHardware/omi#21914": "2026-10-16T23:31:54.556552206Z",
     "ClankerNation/OpenAgents#149": "2026-10-16T10:11:02.378683286Z",
     "ClankerNation/OpenAgents#150": "2026-10-16T10:11:02.378679871Z",
@@ -90,6 +98,7 @@
     "Ikalus1988/MisakaNet#3332": "2026-10-16T14:17:50.579433731Z",
     "Krilliac/ArcaneCore#593": "2026-10-16T10:57:35.19739528Z",
     "Krilliac/ArcaneCore#831": "2026-10-16T14:17:56.031216366Z",
+    "Krilliac/ArcaneCore#894": "2026-10-17T01:30:41.672372071Z",
     "MergeFi/contracts#530": "2026-10-16T10:18:00.248568727Z",
     "MergeFi/contracts#532": "2026-10-16T10:11:02.378144786Z",
     "MergeFi/contracts#535": "2026-10-16T10:11:02.378141201Z",
@@ -402,6 +411,7 @@
   },
   "skip_until": {
     "haoruilee/awesome-agent-native-services#227": "2026-10-17T00:10:33.915996892Z",
-    "paraspell/xcm-tools#2155": "2026-10-16T16:57:35.991646257Z"
+    "paraspell/xcm-tools#2155": "2026-10-16T16:57:35.991646257Z",
+    "paraspell/xcm-tools#2171": "2026-10-17T07:30:47.835025153Z"
   }
 }
